@@ -44,7 +44,7 @@ const AccountSettingsScreen = () => {
     majorCities.map((city, index) => ({
       label: city,
       value: city,
-      disabled: index >= 1,
+      disabled: index >= 2,
     }))
   );
   const [image, setImage] = useState(null);

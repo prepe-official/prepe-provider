@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, Text, View, Image, TouchableOpacity } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import BlueButton from "../components/BlueButton";
@@ -6,6 +6,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import { useDispatch } from "react-redux";
 import { setCity } from "../store/slices/citySlice";
 import { saveProgress } from "../store/slices/signupSlice";
+import axios from "axios";
 
 const majorCities = ["Indore", "Khandwa", "Bhopal", "Gwalior", "Jabalpur"];
 
@@ -20,6 +21,34 @@ export default function CitySelectionScreen({ navigation, route }) {
       disabled: index >= 2, // Disable items at index 2 and above (last three cities)
     }))
   );
+
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const { data } = await axios.get(
+          `${process.env.EXPO_PUBLIC_API_URL}/configuration/get`
+        );
+
+        if (
+          data?.success &&
+          Array.isArray(data?.configuration?.supportedCities)
+        ) {
+          const cityItems = data.configuration.supportedCities.map((city) => ({
+            label: city.name,
+            value: city.name,
+            disabled: city.isActive === false,
+          }));
+          if (cityItems.length > 0) {
+            setItems(cityItems);
+          }
+        }
+      } catch (err) {
+        // Silently fall back to default items without altering UI
+      }
+    };
+
+    fetchCities();
+  }, []);
 
   const handleContinue = () => {
     if (selectedCity) {

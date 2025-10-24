@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Header from "../components/Header";
 import { useSelector } from "react-redux";
 import axios from "axios";
+import configService from "../services/configService";
 
 const DashboardScreen = () => {
   const [showEarningsDropdown, setShowEarningsDropdown] = useState(false);
@@ -25,6 +26,7 @@ const DashboardScreen = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState(0);
 
   const { vendor, token } = useSelector((state) => state.vendor);
 
@@ -78,10 +80,19 @@ const DashboardScreen = () => {
     }
   };
 
+  const fetchRechargeAmount = async () => {
+    try {
+      const amount = await configService.getRechargeAmount();
+      setRechargeAmount(amount);
+    } catch (error) {
+      console.error("Failed to fetch recharge amount:", error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await fetchDashboardData();
+      await Promise.all([fetchDashboardData(), fetchRechargeAmount()]);
       setLoading(false);
     };
     loadData();
@@ -89,7 +100,7 @@ const DashboardScreen = () => {
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await fetchDashboardData();
+    await Promise.all([fetchDashboardData(), fetchRechargeAmount()]);
     setRefreshing(false);
   }, [vendor?._id, token]);
 
@@ -333,25 +344,29 @@ const DashboardScreen = () => {
           </View>
         </View>
 
-        {/* Subscription Progress */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Access Remaining</Text>
+        {/* Subscription Progress - Only show if recharge amount > 0 */}
+        {rechargeAmount > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Access Remaining</Text>
 
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${progressPercentage}%` },
-              ]}
-            />
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${progressPercentage}%` },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.progressText}>
+              {daysRemaining > 0
+                ? `${daysRemaining} day${
+                    daysRemaining > 1 ? "s" : ""
+                  } remaining`
+                : "Expired"}
+            </Text>
           </View>
-
-          <Text style={styles.progressText}>
-            {daysRemaining > 0
-              ? `${daysRemaining} day${daysRemaining > 1 ? "s" : ""} remaining`
-              : "Expired"}
-          </Text>
-        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

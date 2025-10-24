@@ -8,7 +8,13 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-const RechargeModal = ({ visible, onPay, loading, isFirstTime }) => {
+const RechargeModal = ({
+  visible,
+  onPay,
+  loading,
+  isFirstTime,
+  rechargeAmount,
+}) => {
   return (
     <Modal visible={visible} transparent={true} animationType="fade">
       <View style={styles.modalOverlay}>
@@ -29,7 +35,9 @@ const RechargeModal = ({ visible, onPay, loading, isFirstTime }) => {
             {loading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.payButtonText}>Recharge for ₹20</Text>
+              <Text style={styles.payButtonText}>
+                Recharge for ₹{rechargeAmount}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

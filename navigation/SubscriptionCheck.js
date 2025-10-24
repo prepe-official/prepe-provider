@@ -6,6 +6,7 @@ import axios from "axios";
 import { updateVendor } from "../store/slices/vendorSlice";
 import RechargeModal from "../components/RechargeModal";
 import MainTabNavigator from "./MainTabNavigator";
+import configService from "../services/configService";
 
 // Create a module to track picker operations across the app
 export const ImagePickingTracker = {
@@ -25,19 +26,37 @@ const SubscriptionCheck = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState(0);
   const appStateTimeout = useRef(null);
   const lastActive = useRef(Date.now());
 
-  const checkSubscription = useCallback(() => {
+  const checkSubscription = useCallback(async () => {
     if (vendor) {
       const expiryDate = vendor.expiryDate ? new Date(vendor.expiryDate) : null;
       const now = new Date();
-      if (!expiryDate) {
-        setIsFirstTime(true);
-        setShowModal(true);
-      } else if (expiryDate < now) {
-        setIsFirstTime(false);
-        setShowModal(true);
+
+      // First check if we need to show subscription modal
+      const needsSubscription = !expiryDate || expiryDate < now;
+
+      if (needsSubscription) {
+        // Fetch recharge amount before showing modal
+        try {
+          const amount = await configService.getRechargeAmount();
+          setRechargeAmount(amount);
+
+          // Only show modal if amount is not 0
+          if (amount > 0) {
+            setIsFirstTime(!expiryDate);
+            setShowModal(true);
+          } else {
+            setShowModal(false);
+          }
+        } catch (error) {
+          console.error("Failed to fetch recharge amount:", error);
+          // Fallback: show modal with default amount
+          setIsFirstTime(!expiryDate);
+          setShowModal(true);
+        }
       } else {
         setShowModal(false);
       }
@@ -105,7 +124,7 @@ const SubscriptionCheck = () => {
       const { data } = await axios.post(
         `${process.env.EXPO_PUBLIC_API_URL}/vendor/recharge/createPaymentLink`,
         {
-          amount: 20,
+          amount: rechargeAmount,
           vendorId: vendor._id,
         }
       );
@@ -114,7 +133,7 @@ const SubscriptionCheck = () => {
         navigation.navigate("PaymentWebView", {
           url: data.short_url,
           transactionId: data.transactionId,
-          amount: 20,
+          amount: rechargeAmount,
           vendor,
           token,
         });
@@ -137,6 +156,7 @@ const SubscriptionCheck = () => {
         onPay={handlePayment}
         loading={loading}
         isFirstTime={isFirstTime}
+        rechargeAmount={rechargeAmount}
       />
     </>
   );

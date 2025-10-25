@@ -117,14 +117,10 @@ const AddPackScreen = ({ navigation, route }) => {
   useEffect(() => {
     (async () => {
       if (Platform.OS !== "web") {
-        const { status: galleryStatus } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
         const { status: cameraStatus } =
           await ImagePicker.requestCameraPermissionsAsync();
-        if (galleryStatus !== "granted" || cameraStatus !== "granted") {
-          alert(
-            "Sorry, we need camera and media library permissions to make this work!"
-          );
+        if (cameraStatus !== "granted") {
+          alert("Sorry, we need camera permission to take photos!");
         }
       }
     })();
@@ -259,6 +255,9 @@ const AddPackScreen = ({ navigation, route }) => {
         base64: true,
         selectionLimit: 4 - images.length,
         allowsMultipleSelection: true,
+        // Use Android Photo Picker (no permissions required)
+        presentationStyle:
+          ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
       });
       ImagePickingTracker.setImagePickingActive(false);
       processPickerResult(result);

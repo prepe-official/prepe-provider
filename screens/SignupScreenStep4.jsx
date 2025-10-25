@@ -54,17 +54,7 @@ const SignupScreenStep4 = ({ navigation }) => {
   };
 
   const pickImage = async (type) => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert(
-        "Permission Denied",
-        "You need to grant permission to access photos."
-      );
-      return;
-    }
-
+    // No need to request media library permissions - Android Photo Picker handles this
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: type === "single",
@@ -72,6 +62,8 @@ const SignupScreenStep4 = ({ navigation }) => {
       quality: 1,
       allowsMultipleSelection: type === "multiple",
       base64: true,
+      // Use Android Photo Picker (no permissions required)
+      presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
     });
 
     if (!result.canceled) {

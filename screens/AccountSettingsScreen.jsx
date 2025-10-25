@@ -186,6 +186,9 @@ const AccountSettingsScreen = () => {
         quality: 1,
         base64: true,
         allowsMultipleSelection: type === "multiple",
+        // Use Android Photo Picker (no permissions required)
+        presentationStyle:
+          ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
       });
       ImagePickingTracker.setImagePickingActive(false);
 

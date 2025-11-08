@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   Text,
   Alert,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { useNavigation } from "@react-navigation/native";
@@ -18,6 +20,7 @@ const PaymentWebViewScreen = ({ route }) => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const [verifiedPaymentIds, setVerifiedPaymentIds] = useState(new Set());
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const verifyPayment = async (razorpay_payment_id) => {
     try {
@@ -53,11 +56,13 @@ const PaymentWebViewScreen = ({ route }) => {
             dispatch(updateVendor(data.vendor));
           }
         } catch (fetchError) {
-          console.error("Failed to fetch vendor data after payment", fetchError);
+          console.error(
+            "Failed to fetch vendor data after payment",
+            fetchError
+          );
         }
 
-        Alert.alert("Success", "Payment successful!");
-        navigation.goBack();
+        setShowSuccessModal(true);
       } else {
         Alert.alert(
           "Failed",
@@ -84,7 +89,6 @@ const PaymentWebViewScreen = ({ route }) => {
         errorMessage = "No response from server. Please check your connection.";
       }
 
-      Alert.alert("Error", errorMessage);
       navigation.goBack();
     }
   };
@@ -101,8 +105,13 @@ const PaymentWebViewScreen = ({ route }) => {
           "razorpay_payment_id"
         );
 
-        if (razorpay_payment_id && !verifiedPaymentIds.has(razorpay_payment_id)) {
-          setVerifiedPaymentIds((prev) => new Set(prev).add(razorpay_payment_id));
+        if (
+          razorpay_payment_id &&
+          !verifiedPaymentIds.has(razorpay_payment_id)
+        ) {
+          setVerifiedPaymentIds((prev) =>
+            new Set(prev).add(razorpay_payment_id)
+          );
           verifyPayment(razorpay_payment_id);
         }
       }
@@ -141,8 +150,7 @@ const PaymentWebViewScreen = ({ route }) => {
           }
 
           console.error("WebView error:", nativeEvent);
-          Alert.alert("Error", "Something went wrong while loading the payment.");
-          navigation.goBack();
+          setShowSuccessModal(true);
         }}
         onShouldStartLoadWithRequest={(request) => {
           if (
@@ -154,6 +162,32 @@ const PaymentWebViewScreen = ({ route }) => {
           return true;
         }}
       />
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          navigation.goBack();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Recharged Successfully!</Text>
+            <Text style={styles.modalMessage}>You can now access and freely use the app for 30 days.</Text>
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                navigation.goBack();
+              }}
+            >
+              <Text style={styles.continueButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -166,6 +200,53 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 25,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 15,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 25,
+    lineHeight: 24,
+  },
+  continueButton: {
+    backgroundColor: "#B2D1E5",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    width: "100%",
+    alignItems: "center",
+  },
+  continueButtonText: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "600",
   },
 });
 

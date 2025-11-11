@@ -53,9 +53,10 @@ const SubscriptionCheck = () => {
           }
         } catch (error) {
           console.error("Failed to fetch recharge amount:", error);
-          // Fallback: show modal with default amount
-          setIsFirstTime(!expiryDate);
-          setShowModal(true);
+          // Don't show modal if we can't get the amount
+          setShowModal(false);
+          // Optionally show an error message
+          console.warn("Cannot show recharge modal: recharge amount not available");
         }
       } else {
         setShowModal(false);
@@ -119,6 +120,12 @@ const SubscriptionCheck = () => {
   );
 
   const handlePayment = async () => {
+    // Validate amount before proceeding
+    if (!rechargeAmount || rechargeAmount <= 0) {
+      alert("Invalid recharge amount. Please contact support.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data } = await axios.post(
@@ -142,7 +149,8 @@ const SubscriptionCheck = () => {
       }
     } catch (error) {
       console.error("Payment Error:", error);
-      alert("Failed to initiate payment.");
+      const errorMessage = error.response?.data?.error || error.response?.data?.details || "Failed to initiate payment. Please try again.";
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }

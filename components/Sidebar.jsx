@@ -84,16 +84,22 @@ const Sidebar = ({ visible, onClose, hasPendingOrders }) => {
             </TouchableOpacity>
 
             {/* User info */}
-            <View style={styles.userInfo}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              onPress={() => navigateTo("AccountSettings")}
+            >
               {vendor?.image ? (
                 <Image source={{ uri: vendor.image }} style={styles.avatar} />
               ) : (
-                <View style={styles.avatar} />
+                <View style={[styles.avatar, styles.placeholderAvatar]}>
+                  <Ionicons name="camera" size={30} color="#666" />
+                  <Text style={styles.addPhotoText}>Add Photo</Text>
+                </View>
               )}
               <Text style={styles.username}>
                 {vendor?.ownerName || "Username"}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Scrollable Menu Items */}
@@ -213,6 +219,19 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: "rgba(200, 200, 200, 0.8)",
     marginBottom: 10,
+  },
+  placeholderAvatar: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#e0e0e0",
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  addPhotoText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
+    fontWeight: "600",
   },
   username: {
     color: "#000",

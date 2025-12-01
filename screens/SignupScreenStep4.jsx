@@ -53,13 +53,20 @@ const SignupScreenStep4 = ({ navigation }) => {
     dispatch(saveProgress({ shopImages: newImages }));
   };
 
+  const checkImageSize = (base64String) => {
+    // Calculate size in MB from base64 string
+    const sizeInBytes = (base64String.length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+    return sizeInMB;
+  };
+
   const pickImage = async (type) => {
     // No need to request media library permissions - Android Photo Picker handles this
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: type === "single",
       aspect: type === "single" ? [1, 1] : undefined,
-      quality: 1,
+      quality: 0.8, // Reduced quality to help with size limits
       allowsMultipleSelection: type === "multiple",
       base64: true,
       // Use Android Photo Picker (no permissions required)
@@ -68,16 +75,46 @@ const SignupScreenStep4 = ({ navigation }) => {
 
     if (!result.canceled) {
       if (type === "single") {
-        const imageData = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        const base64 = result.assets[0].base64;
+        const imageSize = checkImageSize(base64);
+
+        if (imageSize > 4.5) {
+          Alert.alert(
+            "Image Too Large",
+            `Image size is ${imageSize.toFixed(2)}MB. Please select an image smaller than 4.5MB.`
+          );
+          return;
+        }
+
+        const imageData = `data:image/jpeg;base64,${base64}`;
         setImage(imageData);
         dispatch(saveProgress({ profileImage: imageData }));
       } else {
-        const uris = result.assets.map(
-          (asset) => `data:image/jpeg;base64,${asset.base64}`
-        );
-        const newImages = [...shopImagesLocal, ...uris];
-        setShopImagesLocal(newImages);
-        dispatch(saveProgress({ shopImages: newImages }));
+        const validImages = [];
+        const rejectedImages = [];
+
+        for (const asset of result.assets) {
+          const imageSize = checkImageSize(asset.base64);
+
+          if (imageSize > 4.5) {
+            rejectedImages.push(imageSize.toFixed(2));
+          } else {
+            validImages.push(`data:image/jpeg;base64,${asset.base64}`);
+          }
+        }
+
+        if (rejectedImages.length > 0) {
+          Alert.alert(
+            "Some Images Too Large",
+            `${rejectedImages.length} image(s) exceeded 4.5MB limit and were not added. Sizes: ${rejectedImages.join(", ")}MB`
+          );
+        }
+
+        if (validImages.length > 0) {
+          const newImages = [...shopImagesLocal, ...validImages];
+          setShopImagesLocal(newImages);
+          dispatch(saveProgress({ shopImages: newImages }));
+        }
       }
     }
   };
@@ -187,6 +224,9 @@ const SignupScreenStep4 = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor="#B2D1E5" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.headerText}>Upload Images (Step 4 of 4)</Text>
+        <Text style={styles.noteText}>
+          📌 Note: Image size cannot be more than 4.5MB
+        </Text>
 
         <View style={styles.formContainer}>
           <TouchableOpacity
@@ -264,8 +304,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#000",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  noteText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#555",
     marginBottom: 20,
     textAlign: "center",
+    paddingHorizontal: 20,
   },
   formContainer: {
     width: "90%",

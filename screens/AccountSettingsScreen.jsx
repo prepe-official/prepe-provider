@@ -145,7 +145,7 @@ const AccountSettingsScreen = () => {
       Alert.alert(
         "Error",
         err.response?.data?.message ||
-          "An error occurred while updating password."
+        "An error occurred while updating password."
       );
     } finally {
       setPasswordLoading(false);
@@ -194,12 +194,46 @@ const AccountSettingsScreen = () => {
 
       if (!result.canceled) {
         if (type === "single") {
-          setNewImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+          const base64 = result.assets[0].base64;
+          // Calculate size in MB
+          const sizeInBytes = (base64.length * 3) / 4;
+          const sizeInMB = sizeInBytes / (1024 * 1024);
+
+          if (sizeInMB > 4.5) {
+            Alert.alert(
+              "Image Too Large",
+              `Image size is ${sizeInMB.toFixed(2)}MB. Please select an image smaller than 4.5MB.`
+            );
+            return;
+          }
+
+          setNewImage(`data:image/jpeg;base64,${base64}`);
         } else {
-          const uris = result.assets.map(
-            (asset) => `data:image/jpeg;base64,${asset.base64}`
-          );
-          setNewShopImages([...newShopImages, ...uris]);
+          const validImages = [];
+          const rejectedImages = [];
+
+          for (const asset of result.assets) {
+            const base64 = asset.base64;
+            const sizeInBytes = (base64.length * 3) / 4;
+            const sizeInMB = sizeInBytes / (1024 * 1024);
+
+            if (sizeInMB > 4.5) {
+              rejectedImages.push(sizeInMB.toFixed(2));
+            } else {
+              validImages.push(`data:image/jpeg;base64,${base64}`);
+            }
+          }
+
+          if (rejectedImages.length > 0) {
+            Alert.alert(
+              "Some Images Too Large",
+              `${rejectedImages.length} image(s) exceeded 4.5MB limit and were not added.`
+            );
+          }
+
+          if (validImages.length > 0) {
+            setNewShopImages([...newShopImages, ...validImages]);
+          }
         }
       }
     } catch (error) {
@@ -264,7 +298,7 @@ const AccountSettingsScreen = () => {
       Alert.alert(
         "Error",
         error.response?.data?.message ||
-          "An error occurred while updating your profile."
+        "An error occurred while updating your profile."
       );
     } finally {
       setLoading(false);
@@ -312,7 +346,7 @@ const AccountSettingsScreen = () => {
               Alert.alert(
                 "Error",
                 error.response?.data?.message ||
-                  "An error occurred while deleting your account."
+                "An error occurred while deleting your account."
               );
             }
           },
@@ -373,20 +407,28 @@ const AccountSettingsScreen = () => {
         <Text style={styles.title}>Edit Personal Info</Text>
 
         {/* Profile Picture */}
+        {/* Profile Picture */}
         <View style={styles.profilePicContainer}>
           <TouchableOpacity
             onPress={() => pickImage("single")}
             style={styles.profilePic}
           >
-            <Image
-              source={{
-                uri: newImage || image || "https://placehold.co/120x120",
-              }}
-              style={styles.profilePicImage}
-            />
+            {newImage || image ? (
+              <Image
+                source={{
+                  uri: newImage || image,
+                }}
+                style={styles.profilePicImage}
+              />
+            ) : (
+              <View style={styles.placeholderProfilePic}>
+                <Ionicons name="camera" size={40} color="#666" />
+                <Text style={styles.addPhotoTextLarge}>Add Photo</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => pickImage("single")}>
-            <Text style={styles.editButton}>Edit</Text>
+            <Text style={styles.editButton}>Change Photo</Text>
           </TouchableOpacity>
         </View>
 
@@ -498,7 +540,8 @@ const AccountSettingsScreen = () => {
                 style={styles.addShopImageButton}
                 onPress={() => pickImage("multiple")}
               >
-                <Ionicons name="add" size={24} color="#000" />
+                <Ionicons name="add" size={30} color="#666" />
+                <Text style={styles.addPhotoText}>Add Photos</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -659,6 +702,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
     marginBottom: 10,
     overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#b2d1e5",
+  },
+  placeholderProfilePic: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  addPhotoTextLarge: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 5,
+    fontWeight: "600",
   },
   profilePicImage: {
     width: "100%",
@@ -666,8 +724,8 @@ const styles = StyleSheet.create({
   },
   editButton: {
     fontSize: 16,
-    color: "#000",
-    fontWeight: "500",
+    color: "#1b94e4",
+    fontWeight: "600",
   },
   form: {
     width: "100%",
@@ -749,6 +807,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#f2f2f2",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderStyle: "dashed",
+  },
+  addPhotoText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
+    fontWeight: "600",
   },
   dropdownContainer: {
     width: "100%",

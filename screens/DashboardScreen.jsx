@@ -11,12 +11,14 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import Header from "../components/Header";
 import { useSelector } from "react-redux";
 import axios from "axios";
 import configService from "../services/configService";
 
 const DashboardScreen = () => {
+  const navigation = useNavigation();
   const [showEarningsDropdown, setShowEarningsDropdown] = useState(false);
   const [selectedEarningsOption, setSelectedEarningsOption] =
     useState("This Year");
@@ -46,8 +48,8 @@ const DashboardScreen = () => {
     nowMs <= windowStart
       ? 0
       : nowMs >= expiryMs
-      ? windowMs
-      : nowMs - windowStart;
+        ? windowMs
+        : nowMs - windowStart;
 
   // percentage for the bar
   const progressPercentage = (elapsedMs / windowMs) * 100;
@@ -176,12 +178,22 @@ const DashboardScreen = () => {
       >
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileAvatar}>
-            <Image
-              source={{ uri: dashboardData.image }}
-              style={styles.profileAvatar}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.profileAvatarContainer}
+            onPress={() => navigation.navigate("AccountSettings")}
+          >
+            {dashboardData.image ? (
+              <Image
+                source={{ uri: dashboardData.image }}
+                style={styles.profileAvatar}
+              />
+            ) : (
+              <View style={[styles.profileAvatar, styles.placeholderAvatar]}>
+                <Ionicons name="camera" size={30} color="#666" />
+                <Text style={styles.addPhotoText}>Add Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <Text style={styles.greeting}>Hi, {dashboardData.name}</Text>
           {dashboardData.unreadNotifications > 0 && (
             <TouchableOpacity
@@ -262,7 +274,7 @@ const DashboardScreen = () => {
               <Text style={styles.cardAmount}>
                 {
                   dashboardData.subscribersIncreasePercentage[
-                    selectedEarningsKey
+                  selectedEarningsKey
                   ]
                 }
                 %
@@ -360,9 +372,8 @@ const DashboardScreen = () => {
 
             <Text style={styles.progressText}>
               {daysRemaining > 0
-                ? `${daysRemaining} day${
-                    daysRemaining > 1 ? "s" : ""
-                  } remaining`
+                ? `${daysRemaining} day${daysRemaining > 1 ? "s" : ""
+                } remaining`
                 : "Expired"}
             </Text>
           </View>
@@ -382,12 +393,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 24,
   },
+  profileAvatarContainer: {
+    alignItems: "center",
+    marginBottom: 12,
+  },
   profileAvatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#000",
-    marginBottom: 12,
+    backgroundColor: "#fff", // Changed to white for better placeholder look
+    overflow: "hidden",
+  },
+  placeholderAvatar: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  addPhotoText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 4,
+    fontWeight: "600",
   },
   progressBarContainer: {
     width: "100%",

@@ -17,7 +17,13 @@ import {
   saveProgress,
   nextStep,
   resetToStep,
+  clearProgress,
 } from "../store/slices/signupSlice";
+import { login } from "../store/slices/vendorSlice";
+import {
+  registerForPushNotificationsAsync,
+  sendFCMTokenToServer,
+} from "../utils/notifications";
 
 // This component is responsible for collecting the vendor's bank details.
 const SignupScreenStep3 = ({ navigation }) => {
@@ -40,17 +46,100 @@ const SignupScreenStep3 = ({ navigation }) => {
    * Handles the navigation to the next step.
    * It validates the required inputs and passes all accumulated data forward.
    */
-  const handleNextStep = () => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  /**
+   * Handles the completion of the signup process.
+   * It validates the required inputs, creates the user, logs them in, and navigates to Main.
+   */
+  const handleCompleteSignup = async () => {
     // Validate that required bank details are filled
     if (!ifscCode || !accountNumber || !bankHolderName || !upiId) {
       Alert.alert("Error", "Please fill in all required bank details.");
       return;
     }
 
-    // Save progress and move to next step
-    dispatch(saveProgress({ ifscCode, accountNumber, bankHolderName, upiId }));
-    dispatch(nextStep());
-    navigation.navigate("SignupStep4");
+    setIsLoading(true);
+    try {
+      const payload = {
+        ownerName,
+        shopName,
+        email,
+        password,
+        phoneNumber: phone,
+        address,
+        city,
+        ifscCode,
+        accountNumber,
+        bankHolderName,
+        upiId,
+        image: null, // No image initially
+        shopImages: [], // No shop images initially
+      };
+
+      // Create Vendor
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/vendor/create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      // Auto-login
+      const loginRes = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/vendor/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+
+      const loginData = await loginRes.json();
+
+      if (loginRes.ok && loginData.success) {
+        dispatch(
+          login({
+            vendor: loginData.user,
+            token: loginData.token,
+          })
+        );
+
+        // Clear signup progress
+        dispatch(clearProgress());
+
+        // Register for push notifications
+        const fcmToken = await registerForPushNotificationsAsync();
+        if (fcmToken) {
+          await sendFCMTokenToServer({
+            userId: loginData.user._id,
+            authToken: loginData.token,
+            expoPushToken: fcmToken,
+            isVendor: true,
+          });
+        }
+
+        navigation.replace("Main");
+      } else {
+        Alert.alert(
+          "Account Created",
+          "Your account was created. Please log in to continue."
+        );
+        navigation.navigate("Login");
+      }
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,7 +164,7 @@ const SignupScreenStep3 = ({ navigation }) => {
           <Text style={styles.subMessage}>
             Provide details to receive payments from your subscribers
           </Text>
-          <Text style={styles.stepHeader}>Step 3 of 4</Text>
+          <Text style={styles.stepHeader}>Step 3 of 3</Text>
 
           {/* Bank Holder Name Input */}
           <View style={styles.inputContainer}>
@@ -135,8 +224,15 @@ const SignupScreenStep3 = ({ navigation }) => {
           </View>
 
           {/* Next Button */}
-          <TouchableOpacity style={styles.button} onPress={handleNextStep}>
-            <Text style={styles.buttonText}>Next</Text>
+          {/* Complete Button */}
+          <TouchableOpacity
+            style={[styles.button, isLoading && { opacity: 0.6 }]}
+            onPress={handleCompleteSignup}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? "Creating Account..." : "Complete Sign Up"}
+            </Text>
           </TouchableOpacity>
 
           {/* Go Back Link */}

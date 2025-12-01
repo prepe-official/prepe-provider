@@ -5,7 +5,7 @@ import BlueButton from "../components/BlueButton";
 
 const IntroScreen = ({ navigation }) => {
   const handleNext = () => {
-    navigation.navigate("CitySelection");
+    navigation.navigate("Login");
   };
 
   return (
@@ -23,7 +23,7 @@ const IntroScreen = ({ navigation }) => {
           <View style={styles.featureItem}>
             <Text style={styles.bulletPoint}>•</Text>
             <Text style={styles.featureText}>
-            Intuitive Management
+              Intuitive Management
             </Text>
           </View>
 
@@ -32,7 +32,7 @@ const IntroScreen = ({ navigation }) => {
           <View style={styles.featureItem}>
             <Text style={styles.bulletPoint}>•</Text>
             <Text style={styles.featureText}>
-            Easily Track Subscribers
+              Easily Track Subscribers
             </Text>
           </View>
 

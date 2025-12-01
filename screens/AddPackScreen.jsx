@@ -245,13 +245,20 @@ const AddPackScreen = ({ navigation, route }) => {
     }
   };
 
+  const checkImageSize = (base64String) => {
+    // Calculate size in MB from base64 string
+    const sizeInBytes = (base64String.length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+    return sizeInMB;
+  };
+
   const pickFromGallery = async () => {
     try {
       ImagePickingTracker.setImagePickingActive(true);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 1,
+        quality: 0.8, // Reduced quality to help with size limits
         base64: true,
         selectionLimit: 4 - images.length,
         allowsMultipleSelection: true,
@@ -273,15 +280,41 @@ const AddPackScreen = ({ navigation, route }) => {
       if (images.length + newAssets.length > 4) {
         Alert.alert(
           "Limit reached",
-          `You can only select up to 4 images. You can add ${
-            4 - images.length
+          `You can only select up to 4 images. You can add ${4 - images.length
           } more.`
         );
         return;
       }
-      imageAssets.current = [...imageAssets.current, ...newAssets];
-      const newUris = newAssets.map((asset) => asset.uri);
-      setImages([...images, ...newUris]);
+
+      // Validate image sizes
+      const validAssets = [];
+      const rejectedSizes = [];
+
+      for (const asset of newAssets) {
+        if (asset.base64) {
+          const imageSize = checkImageSize(asset.base64);
+          if (imageSize > 4.5) {
+            rejectedSizes.push(imageSize.toFixed(2));
+          } else {
+            validAssets.push(asset);
+          }
+        } else {
+          validAssets.push(asset);
+        }
+      }
+
+      if (rejectedSizes.length > 0) {
+        Alert.alert(
+          "Some Images Too Large",
+          `${rejectedSizes.length} image(s) exceeded 4.5MB limit and were not added. Sizes: ${rejectedSizes.join(", ")}MB`
+        );
+      }
+
+      if (validAssets.length > 0) {
+        imageAssets.current = [...imageAssets.current, ...validAssets];
+        const newUris = validAssets.map((asset) => asset.uri);
+        setImages([...images, ...newUris]);
+      }
     }
   };
 
@@ -378,7 +411,7 @@ const AddPackScreen = ({ navigation, route }) => {
       Alert.alert(
         "Error",
         `Failed to ${isEditMode ? "update" : "create"} pack. ` +
-          (error.response?.data?.message || "")
+        (error.response?.data?.message || "")
       );
     } finally {
       setLoading(false);
@@ -493,7 +526,7 @@ const AddPackScreen = ({ navigation, route }) => {
       Alert.alert(
         "Error",
         "An error occurred while skipping the date. " +
-          (error.response?.data?.message || "")
+        (error.response?.data?.message || "")
       );
     } finally {
       setSkipLoading(false);
@@ -511,6 +544,9 @@ const AddPackScreen = ({ navigation, route }) => {
         nestedScrollEnabled={true}
       >
         <Text style={styles.sectionTitle}>Add Images</Text>
+        <Text style={styles.noteText}>
+          📌 Note: Image size cannot be more than 4.5MB
+        </Text>
         <View style={styles.imageContainer}>
           {images.map((uri, index) => (
             <View key={index}>
@@ -978,6 +1014,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 8,
+  },
+  noteText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#555",
     marginBottom: 16,
   },
   imageContainer: {

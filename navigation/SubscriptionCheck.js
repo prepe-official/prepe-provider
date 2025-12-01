@@ -27,6 +27,7 @@ const SubscriptionCheck = () => {
   const [loading, setLoading] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState(0);
+  const isRefreshingRef = useRef(false); // FIXED: Use ref to prevent infinite loop
   const appStateTimeout = useRef(null);
   const lastActive = useRef(Date.now());
 
@@ -77,11 +78,13 @@ const SubscriptionCheck = () => {
         );
         if (data.success) {
           dispatch(updateVendor(data.vendor));
+          return data.vendor; // Return updated vendor data
         }
       } catch (error) {
         console.error("Failed to fetch vendor data", error);
       }
     }
+    return null;
   }, [vendor, token, dispatch]);
 
   useEffect(() => {
@@ -98,8 +101,12 @@ const SubscriptionCheck = () => {
         ) {
           // Only check subscription if app was in background for significant time
           clearTimeout(appStateTimeout.current);
-          appStateTimeout.current = setTimeout(() => {
-            fetchVendorData();
+          appStateTimeout.current = setTimeout(async () => {
+            if (!isRefreshingRef.current) {
+              isRefreshingRef.current = true;
+              await fetchVendorData();
+              isRefreshingRef.current = false;
+            }
           }, 500);
         }
       } else if (nextAppState === "background") {
@@ -113,10 +120,24 @@ const SubscriptionCheck = () => {
     };
   }, [fetchVendorData]);
 
+  // FIX: Refresh vendor data BEFORE checking subscription when screen gains focus
   useFocusEffect(
     useCallback(() => {
-      checkSubscription();
-    }, [checkSubscription])
+      const refreshAndCheck = async () => {
+        // Don't run if already refreshing
+        if (isRefreshingRef.current) return;
+
+        isRefreshingRef.current = true;
+        // Fetch latest vendor data first to ensure payment status is current
+        await fetchVendorData();
+        isRefreshingRef.current = false;
+
+        // Now check subscription with updated data
+        checkSubscription();
+      };
+
+      refreshAndCheck();
+    }, [checkSubscription, fetchVendorData]) // FIXED: Removed isRefreshing from dependencies
   );
 
   const handlePayment = async () => {

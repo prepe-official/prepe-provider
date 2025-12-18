@@ -71,7 +71,7 @@ const CreateScreen = ({ navigation }) => {
   }, [vendor]);
 
   // --- START: Modified renderItem ---
-  // 2. Update renderItem to handle both demo and real packs.
+  // 2. Update renderItem to handle demo, draft, and real packs.
   const renderItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => {
@@ -94,12 +94,18 @@ const CreateScreen = ({ navigation }) => {
             <Text style={styles.demoBadgeText}>Demo</Text>
           </View>
         )}
+        {/* Show "Draft" badge for draft packs */}
+        {item.status === "draft" && !item.isDemo && (
+          <View style={styles.draftBadge}>
+            <Text style={styles.draftBadgeText}>Draft</Text>
+          </View>
+        )}
         <View>
-          <Text style={styles.packName}>{item.name}</Text>
+          <Text style={styles.packName}>{item.name || "Untitled Pack"}</Text>
           <Text style={styles.packQuantity}>
-            {item.quantity} {item.unit} / {item.duration}
+            {item.quantity || 0} {item.unit || ""} / {item.duration || ""}
           </Text>
-          <Text style={styles.packPrice}>Rs. {item.price} / Month</Text>
+          <Text style={styles.packPrice}>Rs. {item.price || 0} / Month</Text>
         </View>
         <View>
           <Ionicons
@@ -188,6 +194,20 @@ const styles = StyleSheet.create({
   },
   demoBadgeText: {
     color: "#000",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  draftBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    backgroundColor: "#6c757d", // Grey color for draft
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderBottomRightRadius: 12,
+  },
+  draftBadgeText: {
+    color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
   },

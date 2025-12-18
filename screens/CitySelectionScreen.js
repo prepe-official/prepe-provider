@@ -34,7 +34,7 @@ export default function CitySelectionScreen({ navigation, route }) {
           Array.isArray(data?.configuration?.supportedCities)
         ) {
           const cityItems = data.configuration.supportedCities.map((city) => ({
-            label: city.name,
+            label: city.isActive === false ? `${city.name} (Coming Soon)` : city.name,
             value: city.name,
             disabled: city.isActive === false,
           }));

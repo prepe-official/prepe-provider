@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Image,
   StyleSheet,
@@ -13,133 +13,70 @@ import {
   Alert,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  saveProgress,
-  nextStep,
-  resetToStep,
-  clearProgress,
-} from "../store/slices/signupSlice";
-import { login } from "../store/slices/vendorSlice";
-import {
-  registerForPushNotificationsAsync,
-  sendFCMTokenToServer,
-} from "../utils/notifications";
+import { saveProgress, nextStep, resetToStep } from "../store/slices/signupSlice";
+import { setCity } from "../store/slices/citySlice";
+import DropDownPicker from "react-native-dropdown-picker";
+import axios from "axios";
 
-// This component is responsible for collecting the vendor's bank details.
 const SignupScreenStep3 = ({ navigation }) => {
   const dispatch = useDispatch();
-  const {
-    ownerName,
-    shopName,
-    email,
-    password,
-    phone,
-    address,
-    city,
-    ifscCode,
-    accountNumber,
-    bankHolderName,
-    upiId,
-  } = useSelector((state) => state.signup);
+  const { shopName, city, address } = useSelector((state) => state.signup);
 
-  /**
-   * Handles the navigation to the next step.
-   * It validates the required inputs and passes all accumulated data forward.
-   */
-  const [isLoading, setIsLoading] = useState(false);
+  // City dropdown state
+  const [open, setOpen] = useState(false);
+  const [selectedCity, setSelectedCity] = useState(city || null);
+  const [items, setItems] = useState([]);
+  const [loadingCities, setLoadingCities] = useState(true);
 
-  /**
-   * Handles the completion of the signup process.
-   * It validates the required inputs, creates the user, logs them in, and navigates to Main.
-   */
-  const handleCompleteSignup = async () => {
-    // Validate that required bank details are filled
-    if (!ifscCode || !accountNumber || !bankHolderName || !upiId) {
-      Alert.alert("Error", "Please fill in all required bank details.");
-      return;
-    }
+  useEffect(() => {
+    fetchCities();
+  }, []);
 
-    setIsLoading(true);
+  const fetchCities = async () => {
     try {
-      const payload = {
-        ownerName,
-        shopName,
-        email,
-        password,
-        phoneNumber: phone,
-        address,
-        city,
-        ifscCode,
-        accountNumber,
-        bankHolderName,
-        upiId,
-        image: null, // No image initially
-        shopImages: [], // No shop images initially
-      };
-
-      // Create Vendor
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendor/create`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
+      setLoadingCities(true);
+      const { data } = await axios.get(
+        `${process.env.EXPO_PUBLIC_API_URL}/configuration/get`
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Registration failed");
-      }
-
-      // Auto-login
-      const loginRes = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/vendor/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        }
-      );
-
-      const loginData = await loginRes.json();
-
-      if (loginRes.ok && loginData.success) {
-        dispatch(
-          login({
-            vendor: loginData.user,
-            token: loginData.token,
-          })
-        );
-
-        // Clear signup progress
-        dispatch(clearProgress());
-
-        // Register for push notifications
-        const fcmToken = await registerForPushNotificationsAsync();
-        if (fcmToken) {
-          await sendFCMTokenToServer({
-            userId: loginData.user._id,
-            authToken: loginData.token,
-            expoPushToken: fcmToken,
-            isVendor: true,
-          });
-        }
-
-        navigation.replace("Main");
-      } else {
-        Alert.alert(
-          "Account Created",
-          "Your account was created. Please log in to continue."
-        );
-        navigation.navigate("Login");
+      if (data.success && data.configuration.supportedCities) {
+        const cityItems = data.configuration.supportedCities.map((c) => ({
+          label: c.isActive === false ? `${c.name} (Coming Soon)` : c.name,
+          value: c.name,
+          disabled: c.isActive === false,
+        }));
+        setItems(cityItems);
       }
     } catch (error) {
-      Alert.alert("Error", error.message);
+      console.error("Error fetching cities:", error);
+      Alert.alert("Error", "Failed to load cities. Please check your internet.");
     } finally {
-      setIsLoading(false);
+      setLoadingCities(false);
     }
+  };
+
+  const handleNext = () => {
+    if (!selectedCity) {
+      return Alert.alert("Error", "Please select a city");
+    }
+    if (!address?.trim()) {
+      return Alert.alert("Error", "Please enter your address");
+    }
+
+    // Save progress
+    dispatch(saveProgress({
+      shopName: shopName || "",
+      city: selectedCity,
+      address,
+    }));
+    dispatch(setCity(selectedCity));
+    dispatch(nextStep());
+    navigation.navigate("SignupStep4");
+  };
+
+  const handleGoBack = () => {
+    dispatch(resetToStep(1));
+    navigation.goBack();
   };
 
   return (
@@ -151,104 +88,88 @@ const SignupScreenStep3 = ({ navigation }) => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
       >
-        {/* Logo Image */}
         <Image
           source={require("../assets/splash-logo.png")}
           style={styles.logo}
           resizeMode="contain"
         />
+
         <View style={styles.formContainer}>
-          {/* Header */}
-          <Text style={styles.headerText}>Bank Details</Text>
-          <Text style={styles.subMessage}>
-            Provide details to receive payments from your subscribers
-          </Text>
-          <Text style={styles.stepHeader}>Step 3 of 3</Text>
+          <Text style={styles.headerText}>Create New Account</Text>
+          <Text style={styles.subHeaderText}>Provide Business Detail</Text>
 
-          {/* Bank Holder Name Input */}
+          {/* Shop/Business Name Input (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Bank Holder Name</Text>
+            <Text style={styles.label}>Shop/Business Name (Optional)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter account holder's name"
-              placeholderTextColor="#666"
-              value={bankHolderName}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ bankHolderName: text }))
-              }
+              placeholder="Enter your business name"
+              placeholderTextColor="#999"
+              value={shopName}
+              onChangeText={(text) => dispatch(saveProgress({ shopName: text }))}
             />
           </View>
 
-          {/* Account Number Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Account Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter bank account number"
-              placeholderTextColor="#666"
-              value={accountNumber}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ accountNumber: text }))
-              }
-              keyboardType="number-pad"
+          {/* City Selection */}
+          <View style={[styles.inputContainer, { zIndex: 3000 }]}>
+            <Text style={styles.label}>Select City</Text>
+            <DropDownPicker
+              open={open}
+              value={selectedCity}
+              items={items}
+              setOpen={setOpen}
+              setValue={setSelectedCity}
+              setItems={setItems}
+              placeholder={loadingCities ? "Loading cities..." : "Select City"}
+              style={styles.dropdown}
+              textStyle={styles.dropdownText}
+              dropDownContainerStyle={styles.dropdownList}
+              listItemContainerStyle={styles.dropdownItem}
+              placeholderStyle={{ color: "#999" }}
+              disabledStyle={styles.disabledItem}
+              disabledItemLabelStyle={styles.disabledItemText}
+              disabled={loadingCities}
+              listMode="SCROLLVIEW"
+              zIndex={3000}
+              zIndexInverse={1000}
             />
           </View>
 
-          {/* IFSC Code Input */}
+          {/* Address Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>IFSC Code</Text>
+            <Text style={styles.label}>Address</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Enter bank IFSC code"
-              placeholderTextColor="#666"
-              value={ifscCode}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ ifscCode: text }))
-              }
-              autoCapitalize="characters"
+              style={[styles.input, styles.addressInput]}
+              placeholder="Enter your address"
+              placeholderTextColor="#999"
+              value={address}
+              onChangeText={(text) => dispatch(saveProgress({ address: text }))}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
             />
           </View>
 
-          {/* UPI ID Input (Optional) */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>UPI ID</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your UPI ID"
-              placeholderTextColor="#666"
-              value={upiId}
-              onChangeText={(text) => dispatch(saveProgress({ upiId: text }))}
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Next Button */}
-          {/* Complete Button */}
-          <TouchableOpacity
-            style={[styles.button, isLoading && { opacity: 0.6 }]}
-            onPress={handleCompleteSignup}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? "Creating Account..." : "Complete Sign Up"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Go Back Link */}
-          {/* <View style={styles.loginContainer}>
+          {/* Action Buttons */}
+          <View style={styles.buttonRow}>
             <TouchableOpacity
-              onPress={() => {
-                dispatch(resetToStep(1));
-                navigation.goBack();
-              }}
+              style={styles.goBackButton}
+              onPress={handleGoBack}
             >
-              <Text style={styles.loginLink}>Go Back</Text>
+              <Text style={styles.goBackButtonText}>Go back</Text>
             </TouchableOpacity>
-          </View> */}
+
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={handleNext}
+            >
+              <Text style={styles.nextButtonText}>Next</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
-      <Text style={styles.version}>Version 1.0.0</Text>
     </KeyboardAvoidingView>
   );
 };
@@ -262,7 +183,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 20,
+    paddingVertical: 40,
   },
   logo: {
     width: 120,
@@ -270,91 +191,105 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   formContainer: {
-    width: "88%",
+    width: "85%",
     backgroundColor: "white",
     borderRadius: 15,
     padding: 25,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerText: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "700",
-    color: "#1A202C",
-    marginBottom: 5,
+    color: "#000",
     textAlign: "center",
   },
-  stepHeader: {
+  subHeaderText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#4A5568",
+    color: "#666",
     textAlign: "center",
-    marginBottom: 25,
+    marginBottom: 20,
   },
   inputContainer: {
-    marginBottom: 18,
+    marginBottom: 15,
   },
   label: {
     fontSize: 14,
     color: "#333",
-    marginBottom: 8,
-    fontWeight: "600",
+    marginBottom: 5,
+    fontWeight: "500",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#CBD5E0",
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: "#F7FAFC",
-    color: "#2D3748",
+    backgroundColor: "#fafafa",
+    color: "#333",
   },
-  button: {
-    backgroundColor: "#76c8f2",
+  addressInput: {
+    minHeight: 80,
+    paddingTop: 12,
+  },
+  dropdown: {
+    borderColor: "#ddd",
     borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-    marginTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
+    backgroundColor: "#fafafa",
   },
-  buttonText: {
-    color: "#1A202C",
+  dropdownText: {
     fontSize: 16,
-    fontWeight: "700",
+    color: "#333",
   },
-  loginContainer: {
+  dropdownList: {
+    borderColor: "#ddd",
+    backgroundColor: "#fafafa",
+  },
+  dropdownItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  disabledItem: {
+    backgroundColor: "#F5F5F5",
+  },
+  disabledItemText: {
+    color: "#999999",
+    fontStyle: "italic",
+  },
+  buttonRow: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 10,
+  },
+  goBackButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#333",
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: "center",
   },
-  loginLink: {
-    color: "#2b6cb0",
+  goBackButtonText: {
     fontSize: 14,
-    fontWeight: "700",
-  },
-  version: {
-    position: "absolute",
-    bottom: 15,
-    alignSelf: "center",
-    color: "#4A5568",
-    fontSize: 12,
+    color: "#333",
     fontWeight: "500",
   },
-  subMessage: {
+  nextButton: {
+    flex: 1,
+    backgroundColor: "#B2D1E5",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  nextButtonText: {
     fontSize: 14,
-    color: "#4A5568",
-    textAlign: "center",
-    marginBottom: 15,
+    color: "#000",
+    fontWeight: "600",
   },
 });
 

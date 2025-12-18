@@ -27,6 +27,7 @@ import BlueButton from "../components/BlueButton";
 const AddPackScreen = ({ navigation, route }) => {
   const { pack: packToEdit, fetchPacks } = route.params || {};
   const isEditMode = !!packToEdit;
+  const isDraftPack = isEditMode && packToEdit.status === "draft";
 
   const { vendor, token } = useSelector((state) => state.vendor);
   const [images, setImages] = useState([]);
@@ -338,23 +339,32 @@ const AddPackScreen = ({ navigation, route }) => {
     setProductList(productList.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
-    if (
-      !packName ||
-      !packDescription ||
-      !categoryValue ||
-      !vendor?._id ||
-      productList.length === 0 ||
-      !quantity ||
-      !unit ||
-      !durationValue ||
-      !price ||
-      !deliveryTimeFrom ||
-      !deliveryTimeTo ||
-      (images.length === 0 && !isEditMode)
-    ) {
-      Alert.alert("Error", "Please provide all required fields");
-      return;
+  const handleSubmit = async (publishStatus = "published") => {
+    // For publishing, validate all fields
+    if (publishStatus === "published") {
+      if (
+        !packName ||
+        !packDescription ||
+        !categoryValue ||
+        !vendor?._id ||
+        productList.length === 0 ||
+        !quantity ||
+        !unit ||
+        !durationValue ||
+        !price ||
+        !deliveryTimeFrom ||
+        !deliveryTimeTo ||
+        (images.length === 0 && !isEditMode)
+      ) {
+        Alert.alert("Error", "Please provide all required fields to publish");
+        return;
+      }
+    } else {
+      // For drafts, only require vendorId
+      if (!vendor?._id) {
+        Alert.alert("Error", "Vendor information not found");
+        return;
+      }
     }
 
     setLoading(true);
@@ -373,6 +383,7 @@ const AddPackScreen = ({ navigation, route }) => {
       deliveryTimeStart: deliveryTimeFrom,
       deliveryTimeEnd: deliveryTimeTo,
       isSkipBenefits: allowSkip,
+      status: publishStatus,
     };
 
     if (isEditMode) {
@@ -387,17 +398,51 @@ const AddPackScreen = ({ navigation, route }) => {
 
     try {
       if (isEditMode) {
-        await axios.put(
+        const response = await axios.put(
           `${process.env.EXPO_PUBLIC_API_URL}/pack/update?id=${packToEdit._id}`,
           packData
         );
-        Alert.alert("Success", "Pack updated successfully");
+
+        // Check for bank details requirement
+        if (response.data?.requireBankDetails) {
+          Alert.alert(
+            "Bank Details Required",
+            "Please add your bank details before publishing a pack.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Add Bank Details",
+                onPress: () => navigation.navigate("AccountSettings")
+              }
+            ]
+          );
+          return;
+        }
+
+        Alert.alert("Success", response.data.message || "Pack updated successfully");
       } else {
-        await axios.post(
+        const response = await axios.post(
           `${process.env.EXPO_PUBLIC_API_URL}/pack/create`,
           packData
         );
-        Alert.alert("Success", "Pack created successfully");
+
+        // Check for bank details requirement
+        if (response.data?.requireBankDetails) {
+          Alert.alert(
+            "Bank Details Required",
+            "Please add your bank details before publishing a pack.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Add Bank Details",
+                onPress: () => navigation.navigate("AccountSettings")
+              }
+            ]
+          );
+          return;
+        }
+
+        Alert.alert("Success", response.data.message || "Pack created successfully");
       }
       if (fetchPacks) {
         fetchPacks();
@@ -408,10 +453,26 @@ const AddPackScreen = ({ navigation, route }) => {
         `Failed to ${isEditMode ? "update" : "create"} pack:`,
         error.response?.data || error.message
       );
+
+      // Handle bank details requirement from error response
+      if (error.response?.data?.requireBankDetails) {
+        Alert.alert(
+          "Bank Details Required",
+          "Please add your bank details before publishing a pack.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Add Bank Details",
+              onPress: () => navigation.navigate("AccountSettings")
+            }
+          ]
+        );
+        return;
+      }
+
       Alert.alert(
         "Error",
-        `Failed to ${isEditMode ? "update" : "create"} pack. ` +
-        (error.response?.data?.message || "")
+        error.response?.data?.message || `Failed to ${isEditMode ? "update" : "create"} pack.`
       );
     } finally {
       setLoading(false);
@@ -739,25 +800,43 @@ const AddPackScreen = ({ navigation, route }) => {
         )}
       </ScrollView>
 
-      {isEditMode ? (
+      {isDraftPack ? (
+        // Editing a DRAFT pack - show Delete Draft, Save, and Publish buttons
         <View style={styles.bottomContainer}>
-          {/* {packToEdit?.isSkipBenefits && (
+          <View style={styles.actionButtonsRow}>
             <TouchableOpacity
-              style={styles.skipButton}
-              onPress={onOpenSkipForAllModal}
+              style={styles.deleteButton}
+              onPress={() => setDeleteModalVisible(true)}
             >
-              <Text style={styles.skipButtonText}>
-                Skip for all Subscribers
-              </Text>
-              <Ionicons
-                name="information-circle"
-                style={styles.inactiveIcon}
-                size={24}
-                color="black"
-              />
+              <Text style={styles.deleteButtonText}>Delete Draft</Text>
             </TouchableOpacity>
-          )} */}
-
+            <TouchableOpacity
+              style={styles.saveDraftButton}
+              onPress={() => handleSubmit("draft")}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="black" />
+              ) : (
+                <Text style={styles.saveDraftButtonText}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.publishFullButton}
+            onPress={() => handleSubmit("published")}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="black" />
+            ) : (
+              <Text style={styles.publishButtonText}>Publish</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : isEditMode ? (
+        // Editing a PUBLISHED pack - show Deactivate, Delete, Save
+        <View style={styles.bottomContainer}>
           {!packToEdit?.isDeleted && (
             <TouchableOpacity
               style={styles.inactiveButton}
@@ -797,7 +876,7 @@ const AddPackScreen = ({ navigation, route }) => {
             )}
             <TouchableOpacity
               style={styles.saveButton}
-              onPress={handleSubmit}
+              onPress={() => handleSubmit("published")}
               disabled={loading}
             >
               {loading ? (
@@ -809,17 +888,31 @@ const AddPackScreen = ({ navigation, route }) => {
           </View>
         </View>
       ) : (
-        <TouchableOpacity
-          style={styles.publishButton}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="black" />
-          ) : (
-            <Text style={styles.publishButtonText}>{"Publish Pack"}</Text>
-          )}
-        </TouchableOpacity>
+        // New pack - show Save Draft and Publish buttons
+        <View style={styles.draftButtonsContainer}>
+          <TouchableOpacity
+            style={styles.saveDraftButton}
+            onPress={() => handleSubmit("draft")}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="black" />
+            ) : (
+              <Text style={styles.saveDraftButtonText}>Save Draft</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.publishButton}
+            onPress={() => handleSubmit("published")}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="black" />
+            ) : (
+              <Text style={styles.publishButtonText}>Publish Pack</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       )}
 
       <Modal
@@ -1210,10 +1303,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   publishButton: {
-    position: "absolute",
-    bottom: 20,
-    left: 16,
-    right: 16,
+    flex: 1,
     backgroundColor: "#A9C8E6",
     padding: 16,
     borderRadius: 12,
@@ -1221,7 +1311,36 @@ const styles = StyleSheet.create({
   },
   publishButtonText: {
     color: "black",
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  publishFullButton: {
+    backgroundColor: "#A9C8E6",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  draftButtonsContainer: {
+    flexDirection: "row",
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+    gap: 12,
+  },
+  saveDraftButton: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#333",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveDraftButtonText: {
+    color: "#333",
+    fontSize: 16,
     fontWeight: "bold",
   },
   bottomContainer: {

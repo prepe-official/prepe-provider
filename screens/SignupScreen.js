@@ -11,68 +11,70 @@ import {
   Platform,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { saveProgress, nextStep } from "../store/slices/signupSlice";
-import axios from "axios";
-import DropDownPicker from "react-native-dropdown-picker";
-import { setCity } from "../store/slices/citySlice";
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 
 const VendorSignupScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { ownerName, shopName, email, password } = useSelector(
-    (state) => state.signup
-  );
+  const { ownerName, email, phone } = useSelector((state) => state.signup);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // City Selection State
-  const [open, setOpen] = useState(false);
-  const [selectedCity, setSelectedCity] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loadingCities, setLoadingCities] = useState(true);
-
-  React.useEffect(() => {
-    fetchCities();
-  }, []);
-
-  const fetchCities = async () => {
-    try {
-      setLoadingCities(true);
-      const { data } = await axios.get(
-        `${process.env.EXPO_PUBLIC_API_URL}/configuration/get`
-      );
-
-      if (data.success && data.configuration.supportedCities) {
-        const cityItems = data.configuration.supportedCities.map((city) => ({
-          label: city.name,
-          value: city.name,
-          disabled: city.isActive === false,
-        }));
-        setItems(cityItems);
-      }
-    } catch (error) {
-      console.error("Error fetching cities:", error);
-      Alert.alert("Error", "Failed to load cities. Please check your internet.");
-    } finally {
-      setLoadingCities(false);
-    }
-  };
-
-  const handleNextStep = () => {
+  const handleVerifyPhone = async () => {
     // Validate inputs
-    if (!ownerName || !shopName || !email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
+    if (!ownerName?.trim()) {
+      return Alert.alert("Error", "Please enter your username");
+    }
+    if (!email?.trim()) {
+      return Alert.alert("Error", "Please enter your email");
+    }
+    if (!phone?.trim()) {
+      return Alert.alert("Error", "Please enter your contact number");
     }
 
-    if (!selectedCity) {
-      return Alert.alert("Error", "Please select a city");
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return Alert.alert("Error", "Please enter a valid email address");
     }
 
-    // Save progress and move to next step
-    dispatch(saveProgress({ ownerName, shopName, email, password, city: selectedCity }));
-    dispatch(setCity(selectedCity)); // Save city to Redux for global use
-    dispatch(nextStep());
-    navigation.navigate("SignupStep2");
+    // Basic phone validation (10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(phone.replace(/\D/g, ""))) {
+      return Alert.alert("Error", "Please enter a valid 10-digit phone number");
+    }
+
+    setIsLoading(true);
+    try {
+      // Send OTP to phone
+      const resp = await fetch(`${API_BASE}/utils/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const result = await resp.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to send OTP");
+      }
+
+      // Save data and session ID
+      dispatch(saveProgress({
+        ownerName,
+        email,
+        phone,
+        sessionId: result.sessionId
+      }));
+      dispatch(nextStep());
+      navigation.navigate("SignupStep2");
+    } catch (err) {
+      Alert.alert("Error", err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,63 +94,35 @@ const VendorSignupScreen = ({ navigation }) => {
         />
 
         <View style={styles.formContainer}>
-          <Text style={styles.headerText}>Create Vendor Account</Text>
+          <Text style={styles.headerText}>Create New Account</Text>
+          <Text style={styles.subHeaderText}>Provide Personal Detail</Text>
 
+          {/* Info Box */}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              Please Provide Correct Details as this information Will Be Used By Your Subscriber to reach You
+            </Text>
+          </View>
+
+          {/* Username Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Owner Name</Text>
+            <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter owner's full name"
-              placeholderTextColor="#333333"
+              placeholder="Enter your name"
+              placeholderTextColor="#999"
               value={ownerName}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ ownerName: text }))
-              }
+              onChangeText={(text) => dispatch(saveProgress({ ownerName: text }))}
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Shop Or Business Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your Shop Or Business Name"
-              placeholderTextColor="#333333"
-              value={shopName}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ shopName: text }))
-              }
-            />
-          </View>
-
-          {/* City Selection */}
-          <View style={[styles.inputContainer, { zIndex: 2000 }]}>
-            <Text style={styles.label}>Select City</Text>
-            <DropDownPicker
-              open={open}
-              value={selectedCity}
-              items={items}
-              setOpen={setOpen}
-              setValue={setSelectedCity}
-              setItems={setItems}
-              placeholder={loadingCities ? "Loading cities..." : "Select City"}
-              style={styles.dropdown}
-              textStyle={styles.dropdownText}
-              dropDownContainerStyle={styles.dropdownList}
-              listItemContainerStyle={styles.dropdownItem}
-              placeholderStyle={{ color: "#333333" }}
-              disabled={loadingCities}
-              listMode="SCROLLVIEW"
-              zIndex={3000}
-              zIndexInverse={1000}
-            />
-          </View>
-
+          {/* Email Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter your email"
-              placeholderTextColor="#333333"
+              placeholderTextColor="#999"
               value={email}
               onChangeText={(text) => dispatch(saveProgress({ email: text }))}
               keyboardType="email-address"
@@ -156,33 +130,40 @@ const VendorSignupScreen = ({ navigation }) => {
             />
           </View>
 
+          {/* Contact Number Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>Contact Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your password"
-              placeholderTextColor="#333333"
-              value={password}
-              onChangeText={(text) =>
-                dispatch(saveProgress({ password: text }))
-              }
-              secureTextEntry
+              placeholder="Enter your phone number"
+              placeholderTextColor="#999"
+              value={phone}
+              onChangeText={(text) => dispatch(saveProgress({ phone: text }))}
+              keyboardType="phone-pad"
             />
           </View>
 
-          <TouchableOpacity style={styles.button} onPress={handleNextStep}>
-            <Text style={styles.buttonText}>Next</Text>
+          {/* Verify Button */}
+          <TouchableOpacity
+            style={[styles.button, isLoading && { opacity: 0.6 }]}
+            onPress={handleVerifyPhone}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.buttonText}>Verify Phone Number</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-              <Text style={styles.loginLink}>Login</Text>
+              <Text style={styles.loginLink}>Log In</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-      <Text style={styles.version}>Version 1.0.0</Text>
     </KeyboardAvoidingView>
   );
 };
@@ -199,15 +180,15 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   logo: {
-    width: 150,
-    height: 150,
-    marginBottom: 30,
+    width: 120,
+    height: 120,
+    marginBottom: 20,
   },
   formContainer: {
     width: "85%",
     backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
+    borderRadius: 15,
+    padding: 25,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -218,8 +199,25 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#000",
-    marginBottom: 20,
     textAlign: "center",
+  },
+  subHeaderText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  infoBox: {
+    backgroundColor: "#FFE4E4",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  infoText: {
+    fontSize: 12,
+    color: "#333",
+    textAlign: "center",
+    lineHeight: 18,
   },
   inputContainer: {
     marginBottom: 15,
@@ -233,7 +231,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 5,
+    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 15,
     fontSize: 16,
@@ -242,7 +240,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: "#B2D1E5",
-    borderRadius: 5,
+    borderRadius: 8,
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -259,7 +257,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loginText: {
-    color: "#333",
+    color: "#666",
     fontSize: 14,
   },
   loginLink: {
@@ -267,32 +265,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     textDecorationLine: "underline",
-  },
-  version: {
-    position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
-    color: "#000",
-    fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  dropdown: {
-    borderColor: "#ddd",
-    borderRadius: 5,
-    backgroundColor: "#fafafa",
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  dropdownList: {
-    borderColor: "#ddd",
-    backgroundColor: "#fafafa",
-  },
-  dropdownItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
 });
 

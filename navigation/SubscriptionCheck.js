@@ -34,10 +34,18 @@ const SubscriptionCheck = () => {
   const checkSubscription = useCallback(async () => {
     if (vendor) {
       const expiryDate = vendor.expiryDate ? new Date(vendor.expiryDate) : null;
+      const subscriptionStartDate = vendor.subscriptionStartDate ? new Date(vendor.subscriptionStartDate) : null;
       const now = new Date();
 
-      // First check if we need to show subscription modal
-      const needsSubscription = !expiryDate || expiryDate < now;
+      // NEW LOGIC: Only show recharge modal if:
+      // 1. Provider has started their subscription (published their first pack)
+      // 2. AND their free month has expired
+      // 
+      // If no subscriptionStartDate, they haven't published yet = first month is free, no modal needed
+      const hasStartedSubscription = !!subscriptionStartDate;
+      const isExpired = expiryDate && expiryDate < now;
+
+      const needsSubscription = hasStartedSubscription && isExpired;
 
       if (needsSubscription) {
         // Fetch recharge amount before showing modal
@@ -47,7 +55,7 @@ const SubscriptionCheck = () => {
 
           // Only show modal if amount is not 0
           if (amount > 0) {
-            setIsFirstTime(!expiryDate);
+            setIsFirstTime(false); // Not first time anymore since they've used the app
             setShowModal(true);
           } else {
             setShowModal(false);
@@ -56,7 +64,6 @@ const SubscriptionCheck = () => {
           console.error("Failed to fetch recharge amount:", error);
           // Don't show modal if we can't get the amount
           setShowModal(false);
-          // Optionally show an error message
           console.warn("Cannot show recharge modal: recharge amount not available");
         }
       } else {

@@ -309,7 +309,6 @@ export default function ForgotPasswordScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
-      <Text style={styles.version}>Version 1.0.0</Text>
     </KeyboardAvoidingView>
   );
 }

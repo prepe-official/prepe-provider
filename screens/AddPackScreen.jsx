@@ -55,6 +55,7 @@ const AddPackScreen = ({ navigation, route }) => {
   ]);
 
   const [price, setPrice] = useState("");
+  const [fullPrice, setFullPrice] = useState("");
   const [deliveryTimeFrom, setDeliveryTimeFrom] = useState("");
   const [deliveryTimeTo, setDeliveryTimeTo] = useState("");
   const [allowSkip, setAllowSkip] = useState(false);
@@ -83,6 +84,7 @@ const AddPackScreen = ({ navigation, route }) => {
       setUnit(packToEdit.unit);
       setDurationValue(packToEdit.duration);
       setPrice(packToEdit.price.toString());
+      setFullPrice(packToEdit.strikeoutPrice ? packToEdit.strikeoutPrice.toString() : "");
       setDeliveryTimeFrom(packToEdit.deliveryTimeStart);
       setDeliveryTimeTo(packToEdit.deliveryTimeEnd);
       setAllowSkip(packToEdit.isSkipBenefits);
@@ -380,6 +382,7 @@ const AddPackScreen = ({ navigation, route }) => {
       unit,
       duration: durationValue,
       price,
+      strikeoutPrice: fullPrice ? parseFloat(fullPrice) : null,
       deliveryTimeStart: deliveryTimeFrom,
       deliveryTimeEnd: deliveryTimeTo,
       isSkipBenefits: allowSkip,
@@ -716,8 +719,19 @@ const AddPackScreen = ({ navigation, route }) => {
 
         <View style={styles.row}>
           <TextInput
+            style={[styles.input, { flex: 1 }]}
+            placeholder="Full Price"
+            placeholderTextColor="#666"
+            value={fullPrice}
+            onChangeText={setFullPrice}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.row}>
+          <TextInput
             style={[styles.input, styles.flexInput]}
-            placeholder="Price"
+            placeholder="Selling Price"
             placeholderTextColor="#333"
             value={price}
             onChangeText={setPrice}
@@ -782,7 +796,17 @@ const AddPackScreen = ({ navigation, route }) => {
                 {quantity} {unit} / {durationValue}
               </Text>
             </View>
-            <Text style={styles.priceText}>@ Rs. {price} / Month</Text>
+            <View>
+              <Text style={styles.priceText}>
+                Rs.{price}{" "}
+                {fullPrice ? (
+                  <Text style={{ textDecorationLine: "line-through", color: "#888", fontSize: 12 }}>
+                    Rs.{fullPrice}
+                  </Text>
+                ) : null}{" "}
+                / Month
+              </Text>
+            </View>
           </View>
         </View>
 

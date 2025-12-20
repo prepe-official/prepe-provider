@@ -60,6 +60,14 @@ const DashboardScreen = () => {
       ? Math.ceil((expiryMs - nowMs) / (1000 * 60 * 60 * 24))
       : 0;
 
+  // Check if vendor is past their free trial (first 30 days)
+  const isPastFreeTrial = (() => {
+    if (!vendor?.subscriptionStartDate) return false;
+    const startDate = new Date(vendor.subscriptionStartDate).getTime();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    return nowMs > startDate + thirtyDaysMs;
+  })();
+
   const fetchDashboardData = async () => {
     if (!vendor?._id) {
       setLoading(false);
@@ -356,8 +364,8 @@ const DashboardScreen = () => {
           </View>
         </View>
 
-        {/* Subscription Progress - Only show if recharge amount > 0 */}
-        {rechargeAmount > 0 && (
+        {/* Subscription Progress - Only show if past free trial and recharge amount > 0 */}
+        {rechargeAmount > 0 && isPastFreeTrial && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Access Remaining</Text>
 

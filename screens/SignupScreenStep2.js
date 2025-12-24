@@ -20,6 +20,7 @@ import {
   setOtpVerified,
   resetToStep,
 } from "../store/slices/signupSlice";
+import { Ionicons } from "@expo/vector-icons";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 
@@ -27,11 +28,12 @@ const SignupScreenStep2 = ({ navigation }) => {
   const dispatch = useDispatch();
   const { phone, sessionId } = useSelector((state) => state.signup);
 
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(10);
   const [canResend, setCanResend] = useState(false);
   const timerRef = useRef(null);
+  const inputRefs = useRef([]);
 
   // Timer effect for resend OTP
   useEffect(() => {
@@ -61,9 +63,43 @@ const SignupScreenStep2 = ({ navigation }) => {
     setCanResend(false);
   }, []);
 
+  // Handle OTP input change
+  const handleOtpChange = (value, index) => {
+    if (value.length > 1) {
+      // Handle paste
+      const pastedOtp = value.slice(0, 6).split("");
+      const newOtp = [...otp];
+      pastedOtp.forEach((char, i) => {
+        if (index + i < 6) {
+          newOtp[index + i] = char;
+        }
+      });
+      setOtp(newOtp);
+      const nextIndex = Math.min(index + pastedOtp.length, 5);
+      inputRefs.current[nextIndex]?.focus();
+    } else {
+      const newOtp = [...otp];
+      newOtp[index] = value;
+      setOtp(newOtp);
+
+      // Auto-focus next input
+      if (value && index < 5) {
+        inputRefs.current[index + 1]?.focus();
+      }
+    }
+  };
+
+  // Handle backspace
+  const handleKeyPress = (e, index) => {
+    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
   const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 4) {
-      return Alert.alert("Error", "Please enter a valid OTP");
+    const otpString = otp.join("");
+    if (!otpString || otpString.length < 6) {
+      return Alert.alert("Error", "Please enter the complete 6-digit OTP");
     }
 
     setIsLoading(true);
@@ -71,7 +107,7 @@ const SignupScreenStep2 = ({ navigation }) => {
       const resp = await fetch(`${API_BASE}/utils/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, otp }),
+        body: JSON.stringify({ sessionId, otp: otpString }),
       });
       const result = await resp.json();
 
@@ -109,6 +145,7 @@ const SignupScreenStep2 = ({ navigation }) => {
       dispatch(saveProgress({ sessionId: result.sessionId }));
       setResendTimer(10);
       setCanResend(false);
+      setOtp(["", "", "", "", "", ""]);
       Alert.alert("Success", "OTP has been resent successfully");
     } catch (err) {
       Alert.alert("Error", err.message);
@@ -151,24 +188,28 @@ const SignupScreenStep2 = ({ navigation }) => {
 
           {/* Info Box */}
           <View style={styles.infoBox}>
+            <Ionicons name="information-circle-outline" size={20} color="#666" style={styles.infoIcon} />
             <Text style={styles.infoText}>
-              You'll Receive This OTP Through A Phone Call. Make Sure You're In Good Network Range And A Quiet Place.
+              You'll Receive The OTP Through A Phone Call. Make Sure You're In Good Network Range And A Quite Place.
             </Text>
           </View>
 
-          {/* OTP Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>OTP Code</Text>
-            <TextInput
-              style={styles.otpInput}
-              placeholder="Enter OTP"
-              placeholderTextColor="#999"
-              value={otp}
-              onChangeText={setOtp}
-              keyboardType="number-pad"
-              maxLength={6}
-              textAlign="center"
-            />
+          {/* OTP Input - 6 Separate Boxes */}
+          <Text style={styles.label}>OTP Code</Text>
+          <View style={styles.otpContainer}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => (inputRefs.current[index] = ref)}
+                style={styles.otpBox}
+                value={digit}
+                onChangeText={(value) => handleOtpChange(value, index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={index === 0 ? 6 : 1}
+                selectTextOnFocus
+              />
+            ))}
           </View>
 
           {/* Timer Display */}
@@ -267,34 +308,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 20,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  infoIcon: {
+    marginRight: 10,
+    marginTop: 2,
   },
   infoText: {
     fontSize: 12,
     color: "#333",
-    textAlign: "center",
     lineHeight: 18,
-  },
-  inputContainer: {
-    marginBottom: 15,
+    flex: 1,
   },
   label: {
     fontSize: 14,
     color: "#333",
-    marginBottom: 8,
+    marginBottom: 10,
     fontWeight: "500",
     textAlign: "center",
   },
-  otpInput: {
+  otpContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+    gap: 8,
+  },
+  otpBox: {
+    flex: 1,
+    height: 50,
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    fontSize: 24,
     backgroundColor: "#fafafa",
-    color: "#333",
-    letterSpacing: 10,
+    fontSize: 20,
     fontWeight: "600",
+    textAlign: "center",
+    color: "#333",
   },
   timerText: {
     fontSize: 14,
@@ -304,14 +354,16 @@ const styles = StyleSheet.create({
   },
   resendButton: {
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
     marginBottom: 20,
+    backgroundColor: "#fafafa",
   },
   resendButtonDisabled: {
-    borderColor: "#ccc",
+    borderColor: "#eee",
+    backgroundColor: "#f5f5f5",
   },
   resendButtonText: {
     fontSize: 14,
@@ -319,7 +371,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   resendButtonTextDisabled: {
-    color: "#ccc",
+    color: "#bbb",
   },
   buttonRow: {
     flexDirection: "row",
@@ -329,10 +381,11 @@ const styles = StyleSheet.create({
   goBackButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: "center",
+    backgroundColor: "#fafafa",
   },
   goBackButtonText: {
     fontSize: 14,

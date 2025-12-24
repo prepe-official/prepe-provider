@@ -73,6 +73,8 @@ const AddPackScreen = ({ navigation, route }) => {
   const [allSkippedDatesForPack, setAllSkippedDatesForPack] = useState([]);
   const [fetchingSkipDates, setFetchingSkipDates] = useState(false);
   const [isAllowSkipInfoVisible, setAllowSkipInfoVisible] = useState(false);
+  const [isCompleteProfileModalVisible, setCompleteProfileModalVisible] = useState(false);
+  const hasExplicitlySaved = useRef(false);
 
   useEffect(() => {
     if (isEditMode) {
@@ -128,6 +130,76 @@ const AddPackScreen = ({ navigation, route }) => {
       }
     })();
   }, []);
+
+  // Auto-save as draft when navigating away without explicitly saving
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // Don't auto-save if:
+      // 1. User explicitly saved/published
+      // 2. No data has been entered
+      // 3. Already in edit mode (existing pack)
+      if (hasExplicitlySaved.current || isEditMode) {
+        return;
+      }
+
+      // Check if there's any data to save
+      const hasData = packName || packDescription || productList.length > 0 ||
+        categoryValue || quantity || unit || price || fullPrice ||
+        deliveryTimeFrom || deliveryTimeTo || images.length > 0;
+
+      if (!hasData) {
+        return;
+      }
+
+      // Prevent default navigation
+      e.preventDefault();
+
+      // Save as draft silently
+      const saveDraft = async () => {
+        try {
+          const imageBase64 = imageAssets.current.map((img) => img.base64);
+
+          const packData = {
+            name: packName || "Untitled Pack",
+            description: packDescription,
+            category: categoryValue,
+            vendorId: vendor._id,
+            products: productList,
+            quantity,
+            unit,
+            duration: durationValue,
+            price: price || 0,
+            strikeoutPrice: fullPrice ? parseFloat(fullPrice) : null,
+            deliveryTimeStart: deliveryTimeFrom,
+            deliveryTimeEnd: deliveryTimeTo,
+            isSkipBenefits: allowSkip,
+            status: "draft",
+            images: imageBase64,
+          };
+
+          await axios.post(
+            `${process.env.EXPO_PUBLIC_API_URL}/pack/create`,
+            packData
+          );
+
+          if (fetchPacks) {
+            fetchPacks();
+          }
+        } catch (error) {
+          console.error("Auto-save draft failed:", error);
+        }
+
+        // Continue with navigation after saving
+        navigation.dispatch(e.data.action);
+      };
+
+      saveDraft();
+    });
+
+    return unsubscribe;
+  }, [navigation, isEditMode, packName, packDescription, productList, categoryValue,
+    quantity, unit, price, fullPrice, deliveryTimeFrom, deliveryTimeTo,
+    images, allowSkip, durationValue, vendor, fetchPacks]);
 
   const onOpenSkipForAllModal = async () => {
     setSkipModalVisible(true);
@@ -369,6 +441,7 @@ const AddPackScreen = ({ navigation, route }) => {
       }
     }
 
+    hasExplicitlySaved.current = true;
     setLoading(true);
     const imageBase64 = imageAssets.current.map((img) => img.base64);
 
@@ -408,17 +481,7 @@ const AddPackScreen = ({ navigation, route }) => {
 
         // Check for bank details requirement
         if (response.data?.requireBankDetails) {
-          Alert.alert(
-            "Bank Details Required",
-            "Please add your bank details before publishing a pack.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Add Bank Details",
-                onPress: () => navigation.navigate("AccountSettings")
-              }
-            ]
-          );
+          setCompleteProfileModalVisible(true);
           return;
         }
 
@@ -431,17 +494,7 @@ const AddPackScreen = ({ navigation, route }) => {
 
         // Check for bank details requirement
         if (response.data?.requireBankDetails) {
-          Alert.alert(
-            "Bank Details Required",
-            "Please add your bank details before publishing a pack.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Add Bank Details",
-                onPress: () => navigation.navigate("AccountSettings")
-              }
-            ]
-          );
+          setCompleteProfileModalVisible(true);
           return;
         }
 
@@ -459,17 +512,7 @@ const AddPackScreen = ({ navigation, route }) => {
 
       // Handle bank details requirement from error response
       if (error.response?.data?.requireBankDetails) {
-        Alert.alert(
-          "Bank Details Required",
-          "Please add your bank details before publishing a pack.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Add Bank Details",
-              onPress: () => navigation.navigate("AccountSettings")
-            }
-          ]
-        );
+        setCompleteProfileModalVisible(true);
         return;
       }
 
@@ -607,30 +650,62 @@ const AddPackScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scrollContainer}
         nestedScrollEnabled={true}
       >
-        <Text style={styles.sectionTitle}>Add Images</Text>
+        <Text style={styles.sectionTitle}>Pack Images</Text>
         <Text style={styles.noteText}>
-          📌 Note: Image size cannot be more than 4.5MB
+          *Image should be less than 4MB
         </Text>
         <View style={styles.imageContainer}>
-          {images.map((uri, index) => (
-            <View key={index}>
-              <Image source={{ uri: uri }} style={styles.image} />
-              <TouchableOpacity
-                style={styles.removeIcon}
-                onPress={() => removeImage(index)}
-              >
-                <Ionicons name="close-circle" size={24} color="red" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {images.length < 4 && (
-            <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-              <Ionicons name="add" size={40} color="#ccc" />
-            </TouchableOpacity>
-          )}
+          <View style={styles.imageRow}>
+            {[0, 1].map((boxIndex) => {
+              const imageUri = images[boxIndex];
+              return imageUri ? (
+                <View key={boxIndex} style={styles.imageWrapper}>
+                  <Image source={{ uri: imageUri }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeIcon}
+                    onPress={() => removeImage(boxIndex)}
+                  >
+                    <Ionicons name="close-circle" size={24} color="red" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  key={boxIndex}
+                  style={styles.imagePicker}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="image-outline" size={40} color="#999" />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={styles.imageRow}>
+            {[2, 3].map((boxIndex) => {
+              const imageUri = images[boxIndex];
+              return imageUri ? (
+                <View key={boxIndex} style={styles.imageWrapper}>
+                  <Image source={{ uri: imageUri }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeIcon}
+                    onPress={() => removeImage(boxIndex)}
+                  >
+                    <Ionicons name="close-circle" size={24} color="red" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  key={boxIndex}
+                  style={styles.imagePicker}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="image-outline" size={40} color="#999" />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Add Details</Text>
+        <Text style={styles.sectionTitle}>Pack Details</Text>
         <TextInput
           style={styles.input}
           placeholder="Pack Name"
@@ -649,13 +724,13 @@ const AddPackScreen = ({ navigation, route }) => {
         <View style={styles.addProductContainer}>
           <TextInput
             style={[styles.input, styles.addProductInput]}
-            placeholder="Add Product and Services"
-            placeholderTextColor="#333"
+            placeholder="Add Product or Service"
+            placeholderTextColor="#999"
             value={productName}
             onChangeText={setProductName}
           />
-          <TouchableOpacity style={styles.addButton} onPress={handleAddProduct}>
-            <Text style={styles.addButtonText}>Add</Text>
+          <TouchableOpacity style={styles.addProductIcon} onPress={handleAddProduct}>
+            <Ionicons name="add-circle-outline" size={28} color="#333" />
           </TouchableOpacity>
         </View>
         <View style={styles.productListContainer}>
@@ -684,22 +759,24 @@ const AddPackScreen = ({ navigation, route }) => {
           zIndexInverse={1000}
         />
 
+        <Text style={styles.sectionTitle}>Pack Size & Price</Text>
         <View style={styles.row}>
           <TextInput
             style={[styles.input2, { flex: 0.4, marginHorizontal: 4 }]}
             placeholder="Quantity"
-            placeholderTextColor="#333"
+            placeholderTextColor="#999"
             value={quantity}
             onChangeText={setQuantity}
             keyboardType="numeric"
           />
           <TextInput
             style={[styles.input2, { flex: 1.1, marginHorizontal: 4 }]}
-            placeholder="Unit (e.g., Litre, Kg)"
-            placeholderTextColor="#333"
+            placeholder="Unit"
+            placeholderTextColor="#999"
             value={unit}
             onChangeText={setUnit}
           />
+          <Text style={styles.timeSeparator}>/</Text>
           <DropDownPicker
             listMode="SCROLLVIEW"
             open={durationOpen}
@@ -721,7 +798,7 @@ const AddPackScreen = ({ navigation, route }) => {
           <TextInput
             style={[styles.input, { flex: 1 }]}
             placeholder="Full Price"
-            placeholderTextColor="#666"
+            placeholderTextColor="#999"
             value={fullPrice}
             onChangeText={setFullPrice}
             keyboardType="numeric"
@@ -732,25 +809,24 @@ const AddPackScreen = ({ navigation, route }) => {
           <TextInput
             style={[styles.input, styles.flexInput]}
             placeholder="Selling Price"
-            placeholderTextColor="#333"
+            placeholderTextColor="#999"
             value={price}
             onChangeText={setPrice}
             keyboardType="numeric"
           />
+          <Text style={styles.timeSeparator}>/</Text>
           <View style={[styles.input, styles.flexInput, styles.fakeInput]}>
             <Text>Month</Text>
           </View>
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Availability Timing:</Text>
-        </View>
+        <Text style={styles.sectionTitle}>Pack Delivery Timing</Text>
         <View style={styles.row}>
           <View style={styles.timeInputContainer}>
             <TextInput
               style={[styles.input, styles.flexInput]}
-              placeholder="8am"
-              placeholderTextColor="#666"
+              placeholder="Delivery Time (From)"
+              placeholderTextColor="#999"
               value={deliveryTimeFrom}
               onChangeText={setDeliveryTimeFrom}
             />
@@ -759,14 +835,15 @@ const AddPackScreen = ({ navigation, route }) => {
           <View style={styles.timeInputContainer}>
             <TextInput
               style={[styles.input, styles.flexInput]}
-              placeholder="8pm"
-              placeholderTextColor="#666"
+              placeholder="Delivery Time (To)"
+              placeholderTextColor="#999"
               value={deliveryTimeTo}
               onChangeText={setDeliveryTimeTo}
             />
           </View>
         </View>
 
+        <Text style={styles.sectionTitle}>Additional Option</Text>
         <TouchableOpacity
           style={styles.checkboxContainer}
           onPress={() => {
@@ -789,25 +866,18 @@ const AddPackScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         <View style={styles.previewContainer}>
           <Text style={styles.previewTitle}>Preview of pack</Text>
-          <View style={styles.previewRow}>
-            <View style={{ width: "50%" }}>
-              <Text style={styles.packName}>{packName}</Text>
-              <Text style={styles.packDetails}>
-                {quantity} {unit} / {durationValue}
+          <Text style={styles.packName}>
+            {quantity} {unit} {packName || "Pack Name"}
+          </Text>
+          <Text style={styles.priceText}>
+            Rs.{price || "0"}{" "}
+            {fullPrice ? (
+              <Text style={styles.strikethroughPrice}>
+                Rs.{fullPrice}
               </Text>
-            </View>
-            <View>
-              <Text style={styles.priceText}>
-                Rs.{price}{" "}
-                {fullPrice ? (
-                  <Text style={{ textDecorationLine: "line-through", color: "#888", fontSize: 12 }}>
-                    Rs.{fullPrice}
-                  </Text>
-                ) : null}{" "}
-                / Month
-              </Text>
-            </View>
-          </View>
+            ) : null}{" "}
+            / Month
+          </Text>
         </View>
 
         {isEditMode && typeof packToEdit?.activeSubscribers === "number" && (
@@ -1115,6 +1185,44 @@ const AddPackScreen = ({ navigation, route }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Complete Profile Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isCompleteProfileModalVisible}
+        onRequestClose={() => setCompleteProfileModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setCompleteProfileModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.completeProfileModalContent}>
+              <Text style={styles.completeProfileTitle}>Complete Profile</Text>
+              <Text style={styles.completeProfileDescription}>
+                Please complete your profile and provide necessary information before publishing your first subscription pack.
+              </Text>
+              <Text style={styles.completeProfileUpdateLabel}>Update following :</Text>
+              <View style={styles.completeProfileList}>
+                <Text style={styles.completeProfileListItem}>• Profile image</Text>
+                <Text style={styles.completeProfileListItem}>• Bank Details</Text>
+                <Text style={styles.completeProfileListItem}>• UPI number</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.goToAccountSettingsButton}
+                onPress={() => {
+                  setCompleteProfileModalVisible(false);
+                  navigation.navigate("AccountSettings");
+                }}
+              >
+                <Text style={styles.goToAccountSettingsButtonText}>Go to Account Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1126,7 +1234,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 16,
-    paddingBottom: 200,
+    paddingBottom: 100,
   },
   sectionTitle: {
     fontSize: 18,
@@ -1134,30 +1242,36 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   noteText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#555",
+    fontSize: 12,
+    color: "#FF6B6B",
     marginBottom: 16,
   },
   imageContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     marginBottom: 16,
+    gap: 12,
+  },
+  imageRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  imageWrapper: {
+    position: "relative",
+    flex: 1,
+    aspectRatio: 1,
   },
   imagePicker: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: "#f0f0f0",
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 16,
+    backgroundColor: "#ECF1EE",
     justifyContent: "center",
     alignItems: "center",
-    margin: 4,
   },
   image: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    margin: 4,
+    width: "100%",
+    height: "100%",
+    borderRadius: 16,
   },
   removeIcon: {
     position: "absolute",
@@ -1169,7 +1283,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ECF1EE",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -1178,7 +1292,7 @@ const styles = StyleSheet.create({
   input2: {
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ECF1EE",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 16,
@@ -1189,22 +1303,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 16,
+    position: "relative",
   },
   addProductInput: {
     flex: 1,
-    marginRight: 8,
     marginBottom: 0,
+    paddingRight: 48,
   },
-  addButton: {
-    backgroundColor: "#A9C8E6",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: "black",
-    fontWeight: "bold",
-    fontSize: 16,
+  addProductIcon: {
+    position: "absolute",
+    right: 12,
+    top: 12,
   },
   productListContainer: {
     marginBottom: 16,
@@ -1258,7 +1367,7 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     borderColor: "#E0E0E0",
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ECF1EE",
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -1279,7 +1388,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
     borderRadius: 8,
     padding: 16,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ECF1EE",
     marginBottom: 16,
     width: "100%",
   },
@@ -1308,6 +1417,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "#000",
+  },
+  strikethroughPrice: {
+    textDecorationLine: "line-through",
+    color: "#888",
+    fontSize: 14,
+    fontWeight: "400",
   },
 
   activeSubscribersContainer: {
@@ -1534,6 +1649,56 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  completeProfileModalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    width: "100%",
+  },
+  completeProfileTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 16,
+    color: "#000",
+  },
+  completeProfileDescription: {
+    fontSize: 14,
+    textAlign: "center",
+    color: "#666",
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  completeProfileUpdateLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    alignSelf: "flex-start",
+    marginBottom: 8,
+    color: "#333",
+  },
+  completeProfileList: {
+    alignSelf: "flex-start",
+    marginBottom: 20,
+  },
+  completeProfileListItem: {
+    fontSize: 14,
+    color: "#333",
+    marginBottom: 4,
+  },
+  goToAccountSettingsButton: {
+    backgroundColor: "#A9C8E6",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+  },
+  goToAccountSettingsButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "500",
   },
 });
 

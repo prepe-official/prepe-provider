@@ -47,11 +47,11 @@ const AddPackScreen = ({ navigation, route }) => {
   const [durationOpen, setDurationOpen] = useState(false);
   const [durationValue, setDurationValue] = useState("day");
   const [durations, setDurations] = useState([
-    { label: "Day", value: "day" },
-    { label: "Week", value: "week" },
-    { label: "2 Weeks", value: "2weeks" },
-    { label: "3 Weeks", value: "3weeks" },
-    { label: "Month", value: "month" },
+    { label: "Daily", value: "day" },
+    { label: "Weekly", value: "week" },
+    { label: "Every 2 Weeks", value: "2weeks" },
+    { label: "Every 3 Week", value: "3weeks" },
+    { label: "Every Month", value: "month" },
   ]);
 
   const [price, setPrice] = useState("");
@@ -59,6 +59,7 @@ const AddPackScreen = ({ navigation, route }) => {
   const [deliveryTimeFrom, setDeliveryTimeFrom] = useState("");
   const [deliveryTimeTo, setDeliveryTimeTo] = useState("");
   const [allowSkip, setAllowSkip] = useState(false);
+  const [packType, setPackType] = useState("product");
   const [loading, setLoading] = useState(false);
   const [isSkipModalVisible, setSkipModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -90,6 +91,7 @@ const AddPackScreen = ({ navigation, route }) => {
       setDeliveryTimeFrom(packToEdit.deliveryTimeStart);
       setDeliveryTimeTo(packToEdit.deliveryTimeEnd);
       setAllowSkip(packToEdit.isSkipBenefits);
+      if (packToEdit.packType) setPackType(packToEdit.packType);
       setImages(packToEdit.images || []);
       if (typeof packToEdit.isActive === "boolean") {
         setIsActive(packToEdit.isActive);
@@ -173,6 +175,7 @@ const AddPackScreen = ({ navigation, route }) => {
             deliveryTimeStart: deliveryTimeFrom,
             deliveryTimeEnd: deliveryTimeTo,
             isSkipBenefits: allowSkip,
+            packType: packType,
             status: "draft",
             images: imageBase64,
           };
@@ -416,18 +419,17 @@ const AddPackScreen = ({ navigation, route }) => {
   const handleSubmit = async (publishStatus = "published") => {
     // For publishing, validate all fields
     if (publishStatus === "published") {
+      const isProduct = packType !== "service";
       if (
         !packName ||
         !packDescription ||
         !categoryValue ||
         !vendor?._id ||
-        productList.length === 0 ||
-        !quantity ||
-        !unit ||
+        (isProduct && productList.length === 0) ||
+        (isProduct && !quantity) ||
+        (isProduct && !unit) ||
         !durationValue ||
         !price ||
-        !deliveryTimeFrom ||
-        !deliveryTimeTo ||
         (images.length === 0 && !isEditMode)
       ) {
         Alert.alert("Error", "Please provide all required fields to publish");
@@ -459,6 +461,7 @@ const AddPackScreen = ({ navigation, route }) => {
       deliveryTimeStart: deliveryTimeFrom,
       deliveryTimeEnd: deliveryTimeTo,
       isSkipBenefits: allowSkip,
+      packType: packType,
       status: publishStatus,
     };
 
@@ -705,6 +708,28 @@ const AddPackScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        <Text style={styles.sectionTitle}>This Pack Offer</Text>
+        <View style={styles.packTypeContainer}>
+          <TouchableOpacity
+            style={[styles.packTypeButton, packType === "product" && styles.packTypeButtonActive]}
+            onPress={() => setPackType("product")}
+          >
+            {packType === "product" && (
+              <Ionicons name="checkmark-circle" size={20} color="#2ecc71" style={{ marginRight: 6 }} />
+            )}
+            <Text style={[styles.packTypeText, packType === "product" && styles.packTypeTextActive]}>Product</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.packTypeButton, packType === "service" && styles.packTypeButtonActive]}
+            onPress={() => setPackType("service")}
+          >
+            {packType === "service" && (
+              <Ionicons name="checkmark-circle" size={20} color="#2ecc71" style={{ marginRight: 6 }} />
+            )}
+            <Text style={[styles.packTypeText, packType === "service" && styles.packTypeTextActive]}>Service</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.sectionTitle}>Pack Details</Text>
         <TextInput
           style={styles.input}
@@ -721,28 +746,32 @@ const AddPackScreen = ({ navigation, route }) => {
           onChangeText={setPackDescription}
           multiline
         />
-        <View style={styles.addProductContainer}>
-          <TextInput
-            style={[styles.input, styles.addProductInput]}
-            placeholder="Add Product or Service"
-            placeholderTextColor="#999"
-            value={productName}
-            onChangeText={setProductName}
-          />
-          <TouchableOpacity style={styles.addProductIcon} onPress={handleAddProduct}>
-            <Ionicons name="add-circle-outline" size={28} color="#333" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.productListContainer}>
-          {productList.map((product, index) => (
-            <View key={index} style={styles.productListItem}>
-              <Text style={styles.productListItemText}>{product}</Text>
-              <TouchableOpacity onPress={() => handleRemoveProduct(index)}>
-                <Ionicons name="close-circle" size={24} color="red" />
+        {packType === "product" && (
+          <>
+            <View style={styles.addProductContainer}>
+              <TextInput
+                style={[styles.input, styles.addProductInput]}
+                placeholder="Add Products Offer In This Pack"
+                placeholderTextColor="#999"
+                value={productName}
+                onChangeText={setProductName}
+              />
+              <TouchableOpacity style={styles.addProductIcon} onPress={handleAddProduct}>
+                <Ionicons name="add-circle-outline" size={28} color="#333" />
               </TouchableOpacity>
             </View>
-          ))}
-        </View>
+            <View style={styles.productListContainer}>
+              {productList.map((product, index) => (
+                <View key={index} style={styles.productListItem}>
+                  <Text style={styles.productListItemText}>{product}</Text>
+                  <TouchableOpacity onPress={() => handleRemoveProduct(index)}>
+                    <Ionicons name="close-circle" size={24} color="red" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
         <DropDownPicker
           listMode="SCROLLVIEW"
           open={categoryOpen}
@@ -759,52 +788,54 @@ const AddPackScreen = ({ navigation, route }) => {
           zIndexInverse={1000}
         />
 
-        <Text style={styles.sectionTitle}>Pack Size & Price</Text>
-        <View style={styles.row}>
-          <TextInput
-            style={[styles.input2, { flex: 0.4, marginHorizontal: 4 }]}
-            placeholder="Quantity"
-            placeholderTextColor="#999"
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={[styles.input2, { flex: 1.1, marginHorizontal: 4 }]}
-            placeholder="Unit"
-            placeholderTextColor="#999"
-            value={unit}
-            onChangeText={setUnit}
-          />
-          <Text style={styles.timeSeparator}>/</Text>
-          <DropDownPicker
-            listMode="SCROLLVIEW"
-            open={durationOpen}
-            value={durationValue}
-            items={durations}
-            setOpen={setDurationOpen}
-            setValue={setDurationValue}
-            setItems={setDurations}
-            placeholder="Duration"
-            style={[styles.input2, { flex: 1, marginHorizontal: 4 }]}
-            containerStyle={{ flex: 1 }}
-            dropDownContainerStyle={styles.dropdownContainer}
-            zIndex={2000}
-            zIndexInverse={2000}
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Benefit Frequency</Text>
+        {packType === "product" && (
+          <>
+            <Text style={styles.sectionSubtitle}>Quantity & Unit ex: 1 Liter, 3 Kg, 4 Pieces, 2 Packet, 2 Kits etc.</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input2, { flex: 1, marginHorizontal: 4 }]}
+                placeholder="Quantity"
+                placeholderTextColor="#999"
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="numeric"
+              />
+              <TextInput
+                style={[styles.input2, { flex: 1, marginHorizontal: 4 }]}
+                placeholder="Unit"
+                placeholderTextColor="#999"
+                value={unit}
+                onChangeText={setUnit}
+              />
+            </View>
+          </>
+        )}
+        <DropDownPicker
+          listMode="SCROLLVIEW"
+          open={durationOpen}
+          value={durationValue}
+          items={durations}
+          setOpen={setDurationOpen}
+          setValue={setDurationValue}
+          setItems={setDurations}
+          placeholder="Duration"
+          style={styles.input}
+          containerStyle={{ marginBottom: 16 }}
+          dropDownContainerStyle={styles.dropdownContainer}
+          zIndex={2000}
+          zIndexInverse={2000}
+        />
 
-        <View style={styles.row}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Full Price"
-            placeholderTextColor="#999"
-            value={fullPrice}
-            onChangeText={setFullPrice}
-            keyboardType="numeric"
-          />
-        </View>
-
+        <Text style={styles.sectionTitle}>Pack Pricing</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Full Price"
+          placeholderTextColor="#999"
+          value={fullPrice}
+          onChangeText={setFullPrice}
+          keyboardType="numeric"
+        />
         <View style={styles.row}>
           <TextInput
             style={[styles.input, styles.flexInput]}
@@ -817,29 +848,6 @@ const AddPackScreen = ({ navigation, route }) => {
           <Text style={styles.timeSeparator}>/</Text>
           <View style={[styles.input, styles.flexInput, styles.fakeInput]}>
             <Text>Month</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Pack Delivery Timing</Text>
-        <View style={styles.row}>
-          <View style={styles.timeInputContainer}>
-            <TextInput
-              style={[styles.input, styles.flexInput]}
-              placeholder="Delivery Time (From)"
-              placeholderTextColor="#999"
-              value={deliveryTimeFrom}
-              onChangeText={setDeliveryTimeFrom}
-            />
-          </View>
-          <Text style={styles.timeSeparator}>-</Text>
-          <View style={styles.timeInputContainer}>
-            <TextInput
-              style={[styles.input, styles.flexInput]}
-              placeholder="Delivery Time (To)"
-              placeholderTextColor="#999"
-              value={deliveryTimeTo}
-              onChangeText={setDeliveryTimeTo}
-            />
           </View>
         </View>
 
@@ -1699,6 +1707,40 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "500",
+  },
+  packTypeContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  packTypeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+  },
+  packTypeButtonActive: {
+    borderColor: "#2ecc71",
+    backgroundColor: "#f0faf4",
+  },
+  packTypeText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#666",
+  },
+  packTypeTextActive: {
+    color: "#000",
+    fontWeight: "600",
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: "#888",
+    marginBottom: 10,
   },
 });
 

@@ -32,11 +32,11 @@ const TransactionDetailScreen = ({ route }) => {
           <Text style={styles.itemName}>
             {transaction.subscriptionId?.packId?.name}
           </Text>
-          <Text style={styles.itemQuantity}>{`${
-            transaction.subscriptionId?.packId?.quantity || ""
-          } ${transaction.subscriptionId?.packId?.unit || ""} / ${
-            transaction.subscriptionId?.packId?.duration || ""
-          }`}</Text>
+          <Text style={styles.itemQuantity}>{
+            transaction.subscriptionId?.packId?.packType !== "service"
+              ? `${transaction.subscriptionId?.packId?.quantity || ""} ${transaction.subscriptionId?.packId?.unit || ""} / ${transaction.subscriptionId?.packId?.duration || ""}`
+              : transaction.subscriptionId?.packId?.duration || ""
+          }</Text>
 
           <View style={styles.priceContainer}>
             <Text style={styles.discountedPrice}>Rs. {transaction.amount}</Text>

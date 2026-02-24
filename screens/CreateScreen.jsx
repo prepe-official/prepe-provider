@@ -103,7 +103,9 @@ const CreateScreen = ({ navigation }) => {
         <View>
           <Text style={styles.packName}>{item.name || "Untitled Pack"}</Text>
           <Text style={styles.packQuantity}>
-            {item.quantity || 0} {item.unit || ""} / {item.duration || ""}
+            {item.packType !== "service"
+              ? `${item.quantity || 0} ${item.unit || ""} / ${item.duration || ""}`
+              : item.duration || ""}
           </Text>
           <Text style={styles.packPrice}>Rs. {item.price || 0} / Month</Text>
         </View>

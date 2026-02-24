@@ -167,15 +167,19 @@ const ProductDetailScreen = ({ navigation, route }) => {
             <View style={styles.leftInfo}>
               <Text style={styles.productName}>{product?.name}</Text>
               <Text style={styles.productDescription}>
-                {product?.quantity} {product?.unit}/{product?.duration}
+                {product?.packType !== "service"
+                  ? `${product?.quantity} ${product?.unit}/${product?.duration}`
+                  : product?.duration}
               </Text>
             </View>
-            <View style={styles.rightInfo}>
-              <Text style={styles.deliveryTimeLabel}>Delivery Time</Text>
-              <Text style={styles.deliveryTime}>
-                {product?.deliveryTimeStart} - {product?.deliveryTimeEnd}
-              </Text>
-            </View>
+            {product?.packType !== "service" && (
+              <View style={styles.rightInfo}>
+                <Text style={styles.deliveryTimeLabel}>Delivery Time</Text>
+                <Text style={styles.deliveryTime}>
+                  {product?.deliveryTimeStart} - {product?.deliveryTimeEnd}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.priceContainer}>
@@ -189,17 +193,21 @@ const ProductDetailScreen = ({ navigation, route }) => {
             <Text style={styles.descText}>{product?.description}</Text>
           </View>
 
-          <View style={styles.includeContainer}>
-            <Text style={styles.includeText}>
-              Pack Include -{" "}
-              {product?.products.map((product) => product).join(", ")}
-            </Text>
-          </View>
+          {product?.packType !== "service" && (
+            <View style={styles.includeContainer}>
+              <Text style={styles.includeText}>
+                Pack Include -{" "}
+                {product?.products.map((product) => product).join(", ")}
+              </Text>
+            </View>
+          )}
 
-          <Text style={styles.benefitsText}>
-            You'll get your benefits deliver within 24 hours. After that it'll
-            be delivered at the time mentioned by the provider.
-          </Text>
+          {product?.packType !== "service" && (
+            <Text style={styles.benefitsText}>
+              You'll get your benefits deliver within 24 hours. After that it'll
+              be delivered at the time mentioned by the provider.
+            </Text>
+          )}
 
           <View style={styles.ownerInfoContainer}>
             <View style={styles.ownerLeftSection}>

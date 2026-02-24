@@ -27,7 +27,9 @@
       "edgeToEdgeEnabled": true,
       "package": "com.prepe.provider",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
       "blockedPermissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
@@ -42,6 +44,10 @@
       "eas": {
         "projectId": "724e3dc8-fe89-4a3a-aa19-2703210e399f"
       }
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ]
   }
 }

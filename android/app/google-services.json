@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "857605281858",
+    "project_id": "prepe-9ccff",
+    "storage_bucket": "prepe-9ccff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:857605281858:android:43da8ec0a778032626f5db",
+        "android_client_info": {
+          "package_name": "com.prepe.provider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATYB6HLrw4TFjUiTBF3Tb_6itwIq7yuso"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:857605281858:android:04412cd35bab8fc426f5db",
+        "android_client_info": {
+          "package_name": "com.prepe.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATYB6HLrw4TFjUiTBF3Tb_6itwIq7yuso"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

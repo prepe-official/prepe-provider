@@ -7,9 +7,10 @@ class ConfigService {
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
   }
 
-  async getConfiguration() {
-    // Return cached config if it's still valid
+  async getConfiguration(force = false) {
+    // Return cached config if it's still valid and not forced
     if (
+      !force &&
       this.config &&
       this.lastFetchTime &&
       Date.now() - this.lastFetchTime < this.cacheTimeout
@@ -56,8 +57,8 @@ class ConfigService {
   }
 
   // Helper method to get recharge amount specifically
-  async getRechargeAmount() {
-    const config = await this.getConfiguration();
+  async getRechargeAmount(force = false) {
+    const config = await this.getConfiguration(force);
     return config.providerMonthlyFee;
   }
 

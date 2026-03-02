@@ -34,43 +34,50 @@ const SubscriptionCheck = () => {
   const checkSubscription = useCallback(async () => {
     if (vendor) {
       const expiryDate = vendor.expiryDate ? new Date(vendor.expiryDate) : null;
-      const subscriptionStartDate = vendor.subscriptionStartDate ? new Date(vendor.subscriptionStartDate) : null;
       const now = new Date();
+      const isExpired = !expiryDate || expiryDate < now;
 
-      // NEW LOGIC: Only show recharge modal if:
-      // 1. Provider has started their subscription (published their first pack)
-      // 2. AND their free month has expired
-      // 
-      // If no subscriptionStartDate, they haven't published yet = first month is free, no modal needed
-      const hasStartedSubscription = !!subscriptionStartDate;
-      const isExpired = expiryDate && expiryDate < now;
-
-      const needsSubscription = hasStartedSubscription && isExpired;
-
-      if (needsSubscription) {
-        // Fetch recharge amount before showing modal
+      if (isExpired) {
+        setLoading(true);
         try {
-          const amount = await configService.getRechargeAmount();
+          // 1. Fetch the required recharge amount (provider monthly fee) - FORCE refresh to bypass cache
+          const amount = await configService.getRechargeAmount(true);
           setRechargeAmount(amount);
 
-          // Only show modal if amount is not 0
-          if (amount > 0) {
-            setIsFirstTime(false); // Not first time anymore since they've used the app
-            setShowModal(true);
+          console.log("[SubscriptionCheck] Expiry Date:", expiryDate);
+          console.log("[SubscriptionCheck] Provider Monthly Fee:", amount);
+
+          if (amount === 0) {
+            // 2. If fee is 0, auto-renew via backend
+            console.log("Subscription expired but fee is 0, auto-renewing...");
+            const { data } = await axios.post(
+              `${process.env.EXPO_PUBLIC_API_URL}/vendor/recharge/auto-renew`,
+              { vendorId: vendor._id }
+            );
+
+            if (data.success) {
+              // Refresh vendor data to update local state with new expiry date
+              await fetchVendorData();
+              setShowModal(false);
+            } else {
+              setShowModal(true); // Fallback to modal if auto-renew fails
+            }
           } else {
-            setShowModal(false);
+            // 3. If fee > 0, show the blocking recharge modal
+            setIsFirstTime(false);
+            setShowModal(true);
           }
         } catch (error) {
-          console.error("Failed to fetch recharge amount:", error);
-          // Don't show modal if we can't get the amount
-          setShowModal(false);
-          console.warn("Cannot show recharge modal: recharge amount not available");
+          console.error("Failed to check subscription or auto-renew:", error);
+          setShowModal(true); // Show modal as safety net
+        } finally {
+          setLoading(false);
         }
       } else {
         setShowModal(false);
       }
     }
-  }, [vendor]);
+  }, [vendor, fetchVendorData]);
 
   const fetchVendorData = useCallback(async () => {
     if (vendor && token) {

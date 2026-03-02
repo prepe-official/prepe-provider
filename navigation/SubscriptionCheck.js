@@ -38,46 +38,29 @@ const SubscriptionCheck = () => {
       const isExpired = !expiryDate || expiryDate < now;
 
       if (isExpired) {
-        setLoading(true);
         try {
           // 1. Fetch the required recharge amount (provider monthly fee) - FORCE refresh to bypass cache
           const amount = await configService.getRechargeAmount(true);
           setRechargeAmount(amount);
 
-          console.log("[SubscriptionCheck] Expiry Date:", expiryDate);
-          console.log("[SubscriptionCheck] Provider Monthly Fee:", amount);
-
-          if (amount === 0) {
-            // 2. If fee is 0, auto-renew via backend
-            console.log("Subscription expired but fee is 0, auto-renewing...");
-            const { data } = await axios.post(
-              `${process.env.EXPO_PUBLIC_API_URL}/vendor/recharge/auto-renew`,
-              { vendorId: vendor._id }
-            );
-
-            if (data.success) {
-              // Refresh vendor data to update local state with new expiry date
-              await fetchVendorData();
-              setShowModal(false);
-            } else {
-              setShowModal(true); // Fallback to modal if auto-renew fails
-            }
-          } else {
-            // 3. If fee > 0, show the blocking recharge modal
+          if (amount > 0) {
+            // 2. If fee > 0, show the blocking recharge modal
             setIsFirstTime(false);
             setShowModal(true);
+          } else {
+            // 3. If fee is 0, allow access (hide modal)
+            setShowModal(false);
           }
         } catch (error) {
-          console.error("Failed to check subscription or auto-renew:", error);
-          setShowModal(true); // Show modal as safety net
-        } finally {
-          setLoading(false);
+          console.error("Failed to check subscription configuration:", error);
+          // If we can't check, show modal as safety net if it was already marked as expired
+          setShowModal(true);
         }
       } else {
         setShowModal(false);
       }
     }
-  }, [vendor, fetchVendorData]);
+  }, [vendor]);
 
   const fetchVendorData = useCallback(async () => {
     if (vendor && token) {
